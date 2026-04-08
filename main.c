@@ -9,27 +9,20 @@ static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
-#define WINDOW_WIDTH 160
-#define WINDOW_HEIGHT 144
+#define WINDOW_WIDTH 320
+#define WINDOW_HEIGHT 240
 
 struct Vec3 cameraPos = {0, 6.5, -10};
 struct Sphere s[] = {
-    {.reflectionColor = {0.3, 0.3, 0.3}, .origin = {0, -10050, 40}, .radius = 10000.0, .color = {0.7, 0.7, 0.7}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, 0, 40}, .radius = 5.0, .color = {0.8, 0.5, 0.5}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, 0, -40}, .radius = 5.0, .color = {0.8, 0.5, 0.5}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {40, 0, 0}, .radius = 5.0, .color = {0.5, 0.8, 0.5}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 0}, .radius = 5.0, .color = {0.5, 0.8, 0.5}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, 40, 0}, .radius = 5.0, .color = {0.5, 0.5, 0.8}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, -40, 0}, .radius = 5.0, .color = {0.5, 0.5, 0.8}},
+    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, -5000, 40}, .radius = 4980.0, .color = {0.7, 0.7, 0.7}},
+    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 20.0, .color = {0.9, 0.2, 0.2}},
+    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, 0, 50}, .radius = 20.0, .color = {0.2, 0.9, 0.2}},
+    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {40, 0, 50}, .radius = 20.0, .color = {0.2, 0.2, 0.9}},
 };
 
-struct Sun sun = {.dir={-0.25, -1, -0.75}, .color = {1.0, 1.0, 1.0}};
+struct Sun sun = {.dir={0, -0.2, 1}, .color = {1.0, 1.0, 1.0}};
 
 struct PointLight lights[] = {
-    {.pos = {40, 40 , 40}, .color = {2000.0, 2000.0, 2000.0}},
-    {.pos = {40, 40 , -40}, .color = {2000.0, 2000.0, 2000.0}},
-    {.pos = {-40, 40 , 40}, .color = {2000.0, 2000.0, 2000.0}},
-    {.pos = {-40, 40 , -40}, .color = {2000.0, 2000.0, 2000.0}},
 };
 
 struct InputStates {
@@ -124,7 +117,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
     if (depth == 0) {
         return color;
     }
-    color = Vec3(0.5, 0.5, 0.8);
+    color = Vec3(0.2, 0.2, 0.5);
     struct HitPoint hit = {0};
     int index = calculateHit(r, &hit);
     if (hit.hit) {
@@ -184,6 +177,15 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         color.x += refColor.x * s[index].reflectionColor.x;
         color.y += refColor.y * s[index].reflectionColor.y;
         color.z += refColor.z * s[index].reflectionColor.z;
+
+        // Apply diffuse global illumination
+        struct Ray diffuseRay = {0};
+        diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
+        diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.1));
+        struct Vec3 refDiffuseColor = shade(diffuseRay, depth - 1);
+        color.x += refDiffuseColor.x * s[index].color.x;
+        color.y += refDiffuseColor.y * s[index].color.y;
+        color.z += refDiffuseColor.z * s[index].color.z;
     }
     return color;
 }
@@ -220,7 +222,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
             r.direction = Mat3Vec3Mul(rot, r.direction);
             r.origin = cameraPos;
 
-            struct Vec3 color = shade(r, 2);
+            int samples = 5;
+            struct Vec3 color = {0};
+            for (int i = 0; i < samples; i++) {
+                color = Vec3Add(color, shade(r, 2));
+            }
+
+            color = Vec3Mul(color, 1.0/(float)samples);
+
             float exposure = 1.5;
             color.x = 1 - exp(-color.x * exposure);
             color.y = 1 - exp(-color.y * exposure);

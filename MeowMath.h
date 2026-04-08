@@ -106,6 +106,14 @@ static inline struct Mat3 Mat3Mul(struct Mat3 a, struct Mat3 b) {
     };
 }
 
+static inline struct Vec3 Vec3Cross(struct Vec3 a, struct Vec3 b) {
+    return (struct Vec3){
+        .x=a.y*b.z-a.z*b.y,
+        .y=a.z*b.x-a.x*b.z,
+        .z=a.x*b.y-a.y*b.x
+    };
+}
+
 static inline struct Mat3 RotMat(float h, float p, float b) {
     float f_sin_h = sin(h);
     float f_cos_h = cos(h);
@@ -146,5 +154,22 @@ static inline struct HitPoint IntersectionSphere(struct Ray ray, struct Sphere s
         Temp.hit = true;
     }
     return Temp;
+}
+
+static inline struct Vec3 cosWeightedRandomHemisphereDirection(struct Vec3 n) {
+    struct Vec3 rv2 = {0};
+    rv2.x = (float)SDL_rand(1000000) / 1000000.0f;
+    rv2.y = (float)SDL_rand(1000000) / 1000000.0f;
+
+    struct Vec3 uu = Vec3Normalize(Vec3Cross(n, Vec3(0.0, 1.0, 1.0)));
+    struct Vec3 vv = Vec3Normalize(Vec3Cross(uu, n));
+
+    float ra = sqrt(rv2.y);
+    float rx = ra * cos(6.2831 * rv2.x);
+    float ry = ra * sin(6.2831 * rv2.x);
+    float rz = sqrt(1.0 - rv2.y);
+    struct Vec3 rr = Vec3Add(Vec3Add(Vec3Mul(uu, rx), Vec3Mul(vv, ry)), Vec3Mul(n, rz));
+
+    return Vec3Normalize(rr);
 }
 #endif //RAYMEOWER_MEOWMATH_H
