@@ -10,12 +10,14 @@ static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
-#define WINDOW_WIDTH 160
-#define WINDOW_HEIGHT 144
+#define WINDOW_WIDTH 640
+#define WINDOW_HEIGHT 480
 
-int samples = 2;
+int samples = 5;
 int depth = 2;
-struct Vec3 cameraPos = {0, 0, -10};
+struct Vec3 cameraPos = {-3, 4, -3};
+
+struct Vec3 pixel[WINDOW_WIDTH][WINDOW_HEIGHT];
 
 struct Material m[] = {
     {.color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}},
@@ -71,7 +73,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     sun.dir = Vec3Normalize(sun.dir);
 
-    t = ImportObj("../Objs/Suzanne.obj");
+    t = ImportObj("../Objs/Scene1.obj");
     t.material = &m[0];
 
     return SDL_APP_CONTINUE;
@@ -229,6 +231,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     cameraPos = Vec3Add(cameraPos, posDelta);
 
 
+    #pragma omp parallel for
     for (int x = 0; x < WINDOW_WIDTH; x++) {
         for (int y = 0; y < WINDOW_HEIGHT; y++) {
             struct Ray r;
@@ -262,7 +265,13 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
                 color.z = 1;
             }
 
-            SDL_SetRenderDrawColor(renderer, color.x*255, color.y*255, color.z*255, SDL_ALPHA_OPAQUE);
+            pixel[x][y] = color;
+        }
+    }
+
+    for (int x = 0; x < WINDOW_WIDTH; x++) {
+        for (int y = 0; y < WINDOW_HEIGHT; y++) {
+            SDL_SetRenderDrawColor(renderer, pixel[x][y].x*255, pixel[x][y].y*255,  pixel[x][y].z*255, SDL_ALPHA_OPAQUE);
             SDL_RenderPoint(renderer, (float)x, (float)y);
         }
     }
