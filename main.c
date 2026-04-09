@@ -14,10 +14,18 @@ static Uint64 last_time = 0;
 
 struct Vec3 cameraPos = {0, 6.5, -10};
 struct Sphere s[] = {
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, -5000, 40}, .radius = 4980.0, .color = {0.7, 0.7, 0.7}},
+    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 0.0, .color = {0.8, 0.8, 0.8}},
+    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 0.0, .color = {0.8, 0.8, 0.8}},
+    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 0.0, .color = {0.8, 0.8, 0.8}},
     {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 20.0, .color = {0.9, 0.2, 0.2}},
     {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, 0, 50}, .radius = 20.0, .color = {0.2, 0.9, 0.2}},
     {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {40, 0, 50}, .radius = 20.0, .color = {0.2, 0.2, 0.9}},
+};
+
+struct Triangle t[] = {
+    {.vertices = {{{100, -20, 100}, {-100, -20, 100}, {-100, -20, -100}}}, .color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}},
+    {.vertices = {{{100, -20, -100}, {100, -20, 100}, {-100, -20, -100}}}, .color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}},
+    {.vertices = {{{5, -10, 5}, {30, -5, 5}, {5, -7.5, 20}}}, .color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}}
 };
 
 struct Sun sun = {.dir={0, -0.2, 1}, .color = {1.0, 1.0, 1.0}};
@@ -104,6 +112,13 @@ static inline int calculateHit(struct Ray r, struct HitPoint *hit) {
     int index = 0;
     for (int i = 0; i < sizeof(s)/sizeof(s[0]); i++) {
         struct HitPoint h = IntersectionSphere(r, s[i]);
+        if (h.hit && h.distance < hit->distance) {
+            *hit = h;
+            index = i;
+        }
+    }
+    for (int i = 0; i < sizeof(t)/sizeof(t[0]); i++) {
+        struct HitPoint h = IntersectionTriangle(r, t[i]);
         if (h.hit && h.distance < hit->distance) {
             *hit = h;
             index = i;

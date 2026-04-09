@@ -24,6 +24,17 @@ struct Ray {
     struct Vec3 direction;
 };
 
+struct Plane {
+    struct Vec3 origin;
+    struct Vec3 normal;
+};
+
+struct Triangle {
+    struct Mat3 vertices;
+    struct Vec3 color;
+    struct Vec3 reflectionColor;
+};
+
 struct Sun {
     struct Vec3 dir;
     struct Vec3 color;
@@ -172,4 +183,66 @@ static inline struct Vec3 cosWeightedRandomHemisphereDirection(struct Vec3 n) {
 
     return Vec3Normalize(rr);
 }
+
+static inline struct HitPoint IntersectionPlane(struct Ray ray, struct Plane plane) {
+    struct HitPoint res = {0};
+    float denom = Vec3Dot(ray.direction, plane.normal);
+    if (denom < 1e-3) {
+        return res;
+    }
+    float nom = Vec3Dot(Vec3Sub(plane.origin, ray.origin), plane.normal);
+    res.distance = nom/denom;
+    if (res.distance >= 0) {
+        res.hit = true;
+    }
+    res.normal = plane.normal;
+    res.point = Vec3Add(ray.origin, Vec3Mul(ray.direction, res.distance));
+    return res;
+}
+
+static inline float TriangleDoubleArea(struct Triangle t) {
+    struct Vec3 v1 = Vec3Sub(t.vertices.c[1], t.vertices.c[0]);
+    struct Vec3 v2 = Vec3Sub(t.vertices.c[2], t.vertices.c[0]);
+    return Vec3Length(Vec3Cross(v1, v2));
+}
+
+static inline struct Vec3 TriangleNormal(struct Triangle t) {
+    struct Vec3 v1 = Vec3Sub(t.vertices.c[1], t.vertices.c[0]);
+    struct Vec3 v2 = Vec3Sub(t.vertices.c[2], t.vertices.c[0]);
+    return Vec3Normalize(Vec3Cross(v1, v2));
+}
+
+static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triangle t) {
+    float a = TriangleDoubleArea(t);
+    struct Triangle t1 = {.vertices = {t.vertices.c[0], t.vertices.c[1], p}};
+    struct Triangle t2 = {.vertices = {t.vertices.c[1], t.vertices.c[2], p}};
+    struct Triangle t3 = {.vertices = {t.vertices.c[0], t.vertices.c[2], p}};
+    float a1 = TriangleDoubleArea(t1);
+    float a2 = TriangleDoubleArea(t2);
+    float a3 = TriangleDoubleArea(t3);
+
+    if (a < (a1 + a2 + a3) - 1e-1) {
+        return Vec3(-1, -1, -1);
+    }
+
+    return Vec3(a1/a, a2/a, a3/a);
+}
+
+static inline struct HitPoint IntersectionTriangle(struct Ray ray, struct Triangle triangle) {
+    struct Plane plane;
+    plane.normal = TriangleNormal(triangle);
+    plane.origin = triangle.vertices.c[0];
+
+    struct HitPoint hit = IntersectionPlane(ray, plane);
+    if (!hit.hit) {
+        return hit;
+    }
+
+    struct Vec3 barycentric = PointTriangleIntersection(hit.point, triangle);
+    if (barycentric.x < 0) {
+        hit.hit = false;
+    }
+    return hit;
+}
+
 #endif //RAYMEOWER_MEOWMATH_H
