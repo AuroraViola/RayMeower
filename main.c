@@ -3,32 +3,39 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include "MeowMath.h"
+#include "ObjParser.h"
 
 /* We will use this renderer to draw into this window every frame. */
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
-#define WINDOW_WIDTH 320
-#define WINDOW_HEIGHT 240
+#define WINDOW_WIDTH 160
+#define WINDOW_HEIGHT 144
 
-struct Vec3 cameraPos = {0, 6.5, -10};
-struct Sphere s[] = {
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 0.0, .color = {0.8, 0.8, 0.8}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 0.0, .color = {0.8, 0.8, 0.8}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 0.0, .color = {0.8, 0.8, 0.8}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {-40, 0, 50}, .radius = 20.0, .color = {0.9, 0.2, 0.2}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {0, 0, 50}, .radius = 20.0, .color = {0.2, 0.9, 0.2}},
-    {.reflectionColor = {0.0, 0.0, 0.0}, .origin = {40, 0, 50}, .radius = 20.0, .color = {0.2, 0.2, 0.9}},
+int samples = 2;
+int depth = 2;
+struct Vec3 cameraPos = {0, 0, -10};
+
+struct Material m[] = {
+    {.color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}},
+    {.color = {0.4, 0.4, 0.4}, .reflectionColor = {0.8, 0.8, 0.8}},
+    {.color = {0.9, 0.2, 0.2}, .reflectionColor = {0.0, 0.0, 0.0}},
+    {.color = {0.2, 0.9, 0.2}, .reflectionColor = {0.0, 0.0, 0.0}},
+    {.color = {0.2, 0.2, 0.9}, .reflectionColor = {0.0, 0.0, 0.0}},
 };
 
+/*
 struct Triangle t[] = {
-    {.vertices = {{{100, -20, 100}, {-100, -20, 100}, {-100, -20, -100}}}, .color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}},
-    {.vertices = {{{100, -20, -100}, {100, -20, 100}, {-100, -20, -100}}}, .color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}},
-    {.vertices = {{{5, -10, 5}, {30, -5, 5}, {5, -7.5, 20}}}, .color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}}
+    {.vertices = {{{100, -20, 100}, {-100, -20, 100}, {-100, -20, -100}}},.material = &m[1]},
+    {.vertices = {{{100, -20, -100}, {100, -20, 100}, {-100, -20, -100}}},.material = &m[1]},
+    {.vertices = {{{5, -10, 5}, {30, -5, 5}, {5, -7.5, 20}}},.material = &m[2]},
 };
+*/
 
-struct Sun sun = {.dir={0, -0.2, 1}, .color = {1.0, 1.0, 1.0}};
+struct Mesh t;
+
+struct Sun sun = {.dir={0.2, -1, -1}, .color = {1.0, 1.0, 1.0}};
 
 struct PointLight lights[] = {
 };
@@ -63,6 +70,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     last_time = SDL_GetTicks();
 
     sun.dir = Vec3Normalize(sun.dir);
+
+    t = ImportObj("../Objs/Suzanne.obj");
+    t.material = &m[0];
 
     return SDL_APP_CONTINUE;
 }
@@ -110,15 +120,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 static inline int calculateHit(struct Ray r, struct HitPoint *hit) {
     hit->distance = INFINITY;
     int index = 0;
-    for (int i = 0; i < sizeof(s)/sizeof(s[0]); i++) {
-        struct HitPoint h = IntersectionSphere(r, s[i]);
-        if (h.hit && h.distance < hit->distance) {
-            *hit = h;
-            index = i;
-        }
-    }
-    for (int i = 0; i < sizeof(t)/sizeof(t[0]); i++) {
-        struct HitPoint h = IntersectionTriangle(r, t[i]);
+    for (int i = 0; i < t.triangleCount; i++) {
+        struct HitPoint h = IntersectionTriangle(r, t.triangles[i]);
         if (h.hit && h.distance < hit->distance) {
             *hit = h;
             index = i;
@@ -137,7 +140,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
     int index = calculateHit(r, &hit);
     if (hit.hit) {
         // Apply sun contribution
-        color = s[index].color;
+        color = t.material->color;
         float d = Vec3Dot(sun.dir, hit.normal);
         if (d < 0)
             d = 0;
@@ -159,7 +162,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
 
         // Apply lights contribution
         for (int i = 0; i < sizeof(lights)/sizeof(lights[0]); i++) {
-            struct Vec3 tempColor = s[index].color;
+            struct Vec3 tempColor = t.material->color;
             struct Vec3 incidentVector = Vec3Sub(hit.point, lights[i].pos);
             float distance = Vec3Length(incidentVector);
             incidentVector = Vec3Normalize(incidentVector);
@@ -189,18 +192,18 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
         reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.1));
         struct Vec3 refColor = shade(reflectionRay, depth - 1);
-        color.x += refColor.x * s[index].reflectionColor.x;
-        color.y += refColor.y * s[index].reflectionColor.y;
-        color.z += refColor.z * s[index].reflectionColor.z;
+        color.x += refColor.x * t.material->reflectionColor.x;
+        color.y += refColor.y * t.material->reflectionColor.y;
+        color.z += refColor.z * t.material->reflectionColor.z;
 
         // Apply diffuse global illumination
         struct Ray diffuseRay = {0};
         diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
         diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.1));
         struct Vec3 refDiffuseColor = shade(diffuseRay, depth - 1);
-        color.x += refDiffuseColor.x * s[index].color.x;
-        color.y += refDiffuseColor.y * s[index].color.y;
-        color.z += refDiffuseColor.z * s[index].color.z;
+        color.x += refDiffuseColor.x * t.material->color.x;
+        color.y += refDiffuseColor.y * t.material->color.y;
+        color.z += refDiffuseColor.z * t.material->color.z;
     }
     return color;
 }
@@ -213,7 +216,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     float dt = (float)t - (float)last_time;
     dt /= 1000.0f;
     last_time = t;
-    float speed = 33.0f;
+    float speed = 3.0f;
 
     struct Vec3 posDelta = {0};
 
@@ -232,15 +235,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
             r.direction.x = (float)x / (float)WINDOW_WIDTH - 0.5;
             r.direction.y = (float)y / (float)WINDOW_HEIGHT - 0.5;
             r.direction.y *= -(float)WINDOW_HEIGHT/(float)WINDOW_WIDTH;
-            r.direction.z = 1.0;
+            r.direction.z = 0.5;
             r.direction = Vec3Normalize(r.direction);
             r.direction = Mat3Vec3Mul(rot, r.direction);
             r.origin = cameraPos;
 
-            int samples = 5;
             struct Vec3 color = {0};
             for (int i = 0; i < samples; i++) {
-                color = Vec3Add(color, shade(r, 2));
+                color = Vec3Add(color, shade(r, depth));
             }
 
             color = Vec3Mul(color, 1.0/(float)samples);

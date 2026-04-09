@@ -12,6 +12,11 @@ struct Mat3 {
     struct Vec3 c[3];
 };
 
+struct Material {
+    struct Vec3 color;
+    struct Vec3 reflectionColor;
+};
+
 struct Sphere {
     struct Vec3 origin;
     float radius;
@@ -31,8 +36,6 @@ struct Plane {
 
 struct Triangle {
     struct Mat3 vertices;
-    struct Vec3 color;
-    struct Vec3 reflectionColor;
 };
 
 struct Sun {
@@ -221,7 +224,7 @@ static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triang
     float a2 = TriangleDoubleArea(t2);
     float a3 = TriangleDoubleArea(t3);
 
-    if (a < (a1 + a2 + a3) - 1e-1) {
+    if (a < (a1 + a2 + a3) - 1e-3) {
         return Vec3(-1, -1, -1);
     }
 
@@ -231,6 +234,11 @@ static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triang
 static inline struct HitPoint IntersectionTriangle(struct Ray ray, struct Triangle triangle) {
     struct Plane plane;
     plane.normal = TriangleNormal(triangle);
+
+    if (Vec3Dot(ray.direction, plane.normal) < 0.0) {
+        plane.normal = Vec3Mul(plane.normal, -1);
+    }
+
     plane.origin = triangle.vertices.c[0];
 
     struct HitPoint hit = IntersectionPlane(ray, plane);

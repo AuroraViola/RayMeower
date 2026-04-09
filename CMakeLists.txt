@@ -5,5 +5,6 @@ set(CMAKE_C_STANDARD 23)
 
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 add_executable(RayMeower main.c
-        MeowMath.h)
+        MeowMath.h
+        ObjParser.h)
 target_link_libraries(RayMeower PRIVATE SDL3::SDL3 m)
