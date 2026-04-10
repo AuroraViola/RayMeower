@@ -12,7 +12,7 @@ struct Mesh {
     struct Material *material;
 };
 
-static inline struct Mesh ImportObj(const char *path){
+static inline struct Mesh ImportObj(const char *path, uint16_t materialIndex){
     struct Vec3 *vertices = (struct Vec3 *)malloc(sizeof(struct Vec3) * 8192);
     int vertexCount = 0;
 
@@ -36,6 +36,7 @@ static inline struct Mesh ImportObj(const char *path){
                 m.triangles[triangleCount].vertices.c[0] = vertices[indexs[0]-1];
                 m.triangles[triangleCount].vertices.c[1] = vertices[indexs[1]-1];
                 m.triangles[triangleCount].vertices.c[2] = vertices[indexs[2]-1];
+                m.triangles[triangleCount].materialIndex = materialIndex;
                 triangleCount++;
                 break;
         }

@@ -1,6 +1,7 @@
 #ifndef RAYMEOWER_MEOWMATH_H
 #define RAYMEOWER_MEOWMATH_H
 #include <math.h>
+#include <stdint.h>
 
 struct Vec3 {
     float x;
@@ -36,6 +37,7 @@ struct Plane {
 
 struct Triangle {
     struct Mat3 vertices;
+    uint16_t materialIndex;
 };
 
 struct Sun {

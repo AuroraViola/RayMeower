@@ -14,9 +14,13 @@ static Uint64 last_time = 0;
 #define WINDOW_WIDTH 320
 #define WINDOW_HEIGHT 240
 
-int samples = 16;
+int samples = 1;
 int depth = 2;
-struct Vec3 cameraPos = {-3, 4, -3};
+
+int renderSamples = 256;
+int renderDepth = 4;
+
+struct Vec3 cameraPos = {0, 1, 0};
 
 struct Vec3 pixel[WINDOW_WIDTH][WINDOW_HEIGHT];
 
@@ -28,12 +32,13 @@ struct Material m[] = {
     {.color = {0.2, 0.2, 0.9}, .reflectionColor = {0.0, 0.0, 0.0}},
 };
 
-struct Mesh t;
+struct Mesh scene;
 struct BVHNode *bvhRoot;
 
-struct Sun sun = {.dir={0.2, -1, -1}, .color = {1.0, 1.0, 1.0}};
+struct Sun sun = {.dir={1, -1, -0.5}, .color = {2, 2, 2}};
 
 struct PointLight lights[] = {
+    {.pos = {0, 3, 0}, .color = {5, 4.5, 4}}
 };
 
 struct InputStates {
@@ -67,9 +72,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     sun.dir = Vec3Normalize(sun.dir);
 
-    t = ImportObj("../Objs/Scene1.obj");
-    t.material = &m[0];
-    bvhRoot = BuildBVH(t.triangles, t.triangleCount);
+    scene = ImportObj("../Objs/Scene1.obj", 0);
+    scene.material = &m[0];
+    bvhRoot = BuildBVH(scene.triangles, scene.triangleCount);
 
     return SDL_APP_CONTINUE;
 }
@@ -103,6 +108,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
         if (inputStates.shift) {
             inputStates.up -= 1;
         }
+        if (inputStates.keys[SDLK_L]) {
+            depth = renderDepth;
+            samples = renderSamples;
+        }
     }
     if (event->type == SDL_EVENT_MOUSE_MOTION) {
         inputStates.mouseVertical += event->motion.yrel * 0.001;
@@ -114,8 +123,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return SDL_APP_CONTINUE;
 }
 
-static inline struct HitPoint BVHHit(struct Ray ray, struct BVHNode *node, int depth) {
+static inline struct HitPoint BVHHit(struct Ray ray, struct BVHNode *node, int depth, int *materialIndex, struct Triangle **t) {
     if (node->left == NULL && node->right == NULL) {
+        *materialIndex = node->triangle.materialIndex;
+        *t = &node->triangle;
         return IntersectionTriangle(ray, node->triangle);
     }
     struct HitPoint hit = {0};
@@ -128,15 +139,21 @@ static inline struct HitPoint BVHHit(struct Ray ray, struct BVHNode *node, int d
 #endif
     if (intersection) {
         struct HitPoint h = {0};
+        int hitIndex;
+        struct Triangle *temp_t = NULL;
         if (node->left != NULL) {
-            h = BVHHit(ray, node->left, depth + 1);
+            h = BVHHit(ray, node->left, depth + 1, &hitIndex, &temp_t);
             if (h.hit && h.distance < hit.distance) {
+                *materialIndex = hitIndex;
+                *t = temp_t;
                 hit = h;
             }
         }
         if (node->right != NULL) {
-            h = BVHHit(ray, node->right, depth + 1);
+            h = BVHHit(ray, node->right, depth + 1, &hitIndex, &temp_t);
             if (h.hit && h.distance < hit.distance) {
+                *materialIndex = hitIndex;
+                *t = temp_t;
                 hit = h;
             }
         }
@@ -147,8 +164,8 @@ static inline struct HitPoint BVHHit(struct Ray ray, struct BVHNode *node, int d
 static inline int calculateHit(struct Ray r, struct HitPoint *hit) {
     hit->distance = INFINITY;
     int index = 0;
-    for (int i = 0; i < t.triangleCount; i++) {
-        struct HitPoint h = IntersectionTriangle(r, t.triangles[i]);
+    for (int i = 0; i < scene.triangleCount; i++) {
+        struct HitPoint h = IntersectionTriangle(r, scene.triangles[i]);
         if (h.hit && h.distance < hit->distance) {
             *hit = h;
             index = i;
@@ -162,14 +179,15 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
     if (depth == 0) {
         return color;
     }
-    color = Vec3(0.2, 0.2, 0.5);
+    color = Vec3(0.5, 0.5, 0.8);
     struct HitPoint hit = {0};
     //index = calculateHit(r, &hit);
     int index = -1;
-    hit = BVHHit(r, bvhRoot, 0);
+    struct Triangle *triangleID = NULL;
+    hit = BVHHit(r, bvhRoot, 0, &index, &triangleID);
     if (hit.hit) {
         // Apply sun contribution
-        color = t.material->color;
+        color = m[index].color;
         float d = Vec3Dot(sun.dir, hit.normal);
         if (d < 0)
             d = 0;
@@ -180,10 +198,12 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         // Apply sun shadows
         struct Ray shadowRay = {0};
         shadowRay.direction = Vec3Mul(sun.dir, -1);
-        shadowRay.origin = Vec3Add(hit.point, Vec3Mul(shadowRay.direction, 0.1));
+        shadowRay.origin = Vec3Add(hit.point, Vec3Mul(shadowRay.direction, 0.001));
         struct HitPoint shadowHit = {0};
-        int shadowIndex = calculateHit(shadowRay, &shadowHit);
-        if (shadowHit.hit && shadowIndex != index) {
+        int dummy = 0;
+        struct Triangle *shadowTriangleID = NULL;
+        shadowHit = BVHHit(shadowRay, bvhRoot, 0, &dummy, &shadowTriangleID);
+        if (shadowHit.hit && shadowTriangleID != triangleID) {
             color.x = 0;
             color.y = 0;
             color.z = 0;
@@ -191,7 +211,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
 
         // Apply lights contribution
         for (int i = 0; i < sizeof(lights)/sizeof(lights[0]); i++) {
-            struct Vec3 tempColor = t.material->color;
+            struct Vec3 tempColor = m[index].color;
             struct Vec3 incidentVector = Vec3Sub(hit.point, lights[i].pos);
             float distance = Vec3Length(incidentVector);
             incidentVector = Vec3Normalize(incidentVector);
@@ -201,8 +221,9 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
             shadowRay.origin = lights[i].pos;
             shadowRay.direction = incidentVector;
             struct HitPoint shadowHit = {0};
-            int shadowIndex = calculateHit(shadowRay, &shadowHit);
-            if (shadowHit.hit && shadowIndex != index) {
+            struct Triangle *shadowTriangleID = NULL;
+            shadowHit = BVHHit(shadowRay, bvhRoot, 0, &dummy, &shadowTriangleID);
+            if (shadowHit.hit && shadowTriangleID != triangleID) {
                 continue;
             }
 
@@ -219,20 +240,20 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         struct Ray reflectionRay = {0};
         struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
         reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
-        reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.1));
+        reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
         struct Vec3 refColor = shade(reflectionRay, depth - 1);
-        color.x += refColor.x * t.material->reflectionColor.x;
-        color.y += refColor.y * t.material->reflectionColor.y;
-        color.z += refColor.z * t.material->reflectionColor.z;
+        color.x += refColor.x * m[index].reflectionColor.x;
+        color.y += refColor.y * m[index].reflectionColor.y;
+        color.z += refColor.z * m[index].reflectionColor.z;
 
         // Apply diffuse global illumination
         struct Ray diffuseRay = {0};
         diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
-        diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.1));
+        diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
         struct Vec3 refDiffuseColor = shade(diffuseRay, depth - 1);
-        color.x += refDiffuseColor.x * t.material->color.x;
-        color.y += refDiffuseColor.y * t.material->color.y;
-        color.z += refDiffuseColor.z * t.material->color.z;
+        color.x += refDiffuseColor.x * m[index].color.x;
+        color.y += refDiffuseColor.y * m[index].color.y;
+        color.z += refDiffuseColor.z * m[index].color.z;
     }
     return color;
 }
