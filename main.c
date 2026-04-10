@@ -4,16 +4,17 @@
 #include <SDL3/SDL_main.h>
 #include "MeowMath.h"
 #include "ObjParser.h"
+#include "bvh.h"
 
 /* We will use this renderer to draw into this window every frame. */
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 480
+#define WINDOW_WIDTH 320
+#define WINDOW_HEIGHT 240
 
-int samples = 5;
+int samples = 16;
 int depth = 2;
 struct Vec3 cameraPos = {-3, 4, -3};
 
@@ -27,15 +28,8 @@ struct Material m[] = {
     {.color = {0.2, 0.2, 0.9}, .reflectionColor = {0.0, 0.0, 0.0}},
 };
 
-/*
-struct Triangle t[] = {
-    {.vertices = {{{100, -20, 100}, {-100, -20, 100}, {-100, -20, -100}}},.material = &m[1]},
-    {.vertices = {{{100, -20, -100}, {100, -20, 100}, {-100, -20, -100}}},.material = &m[1]},
-    {.vertices = {{{5, -10, 5}, {30, -5, 5}, {5, -7.5, 20}}},.material = &m[2]},
-};
-*/
-
 struct Mesh t;
+struct BVHNode *bvhRoot;
 
 struct Sun sun = {.dir={0.2, -1, -1}, .color = {1.0, 1.0, 1.0}};
 
@@ -75,6 +69,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     t = ImportObj("../Objs/Scene1.obj");
     t.material = &m[0];
+    bvhRoot = BuildBVH(t.triangles, t.triangleCount);
 
     return SDL_APP_CONTINUE;
 }
@@ -119,6 +114,36 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return SDL_APP_CONTINUE;
 }
 
+static inline struct HitPoint BVHHit(struct Ray ray, struct BVHNode *node, int depth) {
+    if (node->left == NULL && node->right == NULL) {
+        return IntersectionTriangle(ray, node->triangle);
+    }
+    struct HitPoint hit = {0};
+    hit.distance = INFINITY;
+    bool intersection = IntersectionAABB(ray, node->aabb);
+#if 0
+    if (depth == 9) {
+        return (struct HitPoint) {.hit = intersection, .normal = {0, 0, 1}};
+    }
+#endif
+    if (intersection) {
+        struct HitPoint h = {0};
+        if (node->left != NULL) {
+            h = BVHHit(ray, node->left, depth + 1);
+            if (h.hit && h.distance < hit.distance) {
+                hit = h;
+            }
+        }
+        if (node->right != NULL) {
+            h = BVHHit(ray, node->right, depth + 1);
+            if (h.hit && h.distance < hit.distance) {
+                hit = h;
+            }
+        }
+    }
+    return hit;
+}
+
 static inline int calculateHit(struct Ray r, struct HitPoint *hit) {
     hit->distance = INFINITY;
     int index = 0;
@@ -139,7 +164,9 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
     }
     color = Vec3(0.2, 0.2, 0.5);
     struct HitPoint hit = {0};
-    int index = calculateHit(r, &hit);
+    //index = calculateHit(r, &hit);
+    int index = -1;
+    hit = BVHHit(r, bvhRoot, 0);
     if (hit.hit) {
         // Apply sun contribution
         color = t.material->color;
@@ -235,16 +262,20 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     for (int x = 0; x < WINDOW_WIDTH; x++) {
         for (int y = 0; y < WINDOW_HEIGHT; y++) {
             struct Ray r;
-            r.direction.x = (float)x / (float)WINDOW_WIDTH - 0.5;
-            r.direction.y = (float)y / (float)WINDOW_HEIGHT - 0.5;
-            r.direction.y *= -(float)WINDOW_HEIGHT/(float)WINDOW_WIDTH;
-            r.direction.z = 0.5;
-            r.direction = Vec3Normalize(r.direction);
-            r.direction = Mat3Vec3Mul(rot, r.direction);
             r.origin = cameraPos;
 
             struct Vec3 color = {0};
             for (int i = 0; i < samples; i++) {
+                struct Vec3 rv2 = {0};
+                rv2.x = (float)SDL_rand(1000000) / 1000000.0f;
+                rv2.y = (float)SDL_rand(1000000) / 1000000.0f;
+
+                r.direction.x = ((float)x + rv2.x) / (float)WINDOW_WIDTH - 0.5;
+                r.direction.y = ((float)y + rv2.y) / (float)WINDOW_HEIGHT - 0.5;
+                r.direction.y *= -(float)WINDOW_HEIGHT/(float)WINDOW_WIDTH;
+                r.direction.z = 0.5;
+                r.direction = Vec3Normalize(r.direction);
+                r.direction = Mat3Vec3Mul(rot, r.direction);
                 color = Vec3Add(color, shade(r, depth));
             }
 

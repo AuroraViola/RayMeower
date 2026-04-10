@@ -55,6 +55,11 @@ struct HitPoint {
     float distance;
 };
 
+struct AABB {
+    struct Vec3 min;
+    struct Vec3 max;
+};
+
 static inline struct Vec3 Vec3(float x, float y, float z) {
     return (struct Vec3){
         .x=x,
@@ -104,6 +109,38 @@ static inline struct Vec3 Vec3Mul(struct Vec3 a, float b) {
     };
 }
 
+static inline struct Vec3 Vec3Div(struct Vec3 a, struct Vec3 b) {
+    return (struct Vec3){
+        .x=a.x/b.x,
+        .y=a.y/b.y,
+        .z=a.z/b.z
+    };
+}
+
+static inline struct Vec3 Vec3Cross(struct Vec3 a, struct Vec3 b) {
+    return (struct Vec3){
+        .x=a.y*b.z-a.z*b.y,
+        .y=a.z*b.x-a.x*b.z,
+        .z=a.x*b.y-a.y*b.x
+    };
+}
+
+static inline struct Vec3 Vec3Min(struct Vec3 a, struct Vec3 b) {
+    return (struct Vec3) {
+        .x=a.x<b.x?a.x:b.x,
+        .y=a.y<b.y?a.y:b.y,
+        .z=a.z<b.z?a.z:b.z
+    };
+}
+
+static inline struct Vec3 Vec3Max(struct Vec3 a, struct Vec3 b) {
+    return (struct Vec3) {
+        .x=a.x>b.x?a.x:b.x,
+        .y=a.y>b.y?a.y:b.y,
+        .z=a.z>b.z?a.z:b.z
+    };
+}
+
 static inline struct Vec3 Mat3Vec3Mul(struct Mat3 m, struct Vec3 v) {
     return (struct Vec3){
         .x=Vec3Dot(m.c[0], v),
@@ -117,14 +154,6 @@ static inline struct Mat3 Mat3Mul(struct Mat3 a, struct Mat3 b) {
         .c[0]=Mat3Vec3Mul(a, b.c[0]),
         .c[1]=Mat3Vec3Mul(a, b.c[1]),
         .c[2]=Mat3Vec3Mul(a, b.c[2]),
-    };
-}
-
-static inline struct Vec3 Vec3Cross(struct Vec3 a, struct Vec3 b) {
-    return (struct Vec3){
-        .x=a.y*b.z-a.z*b.y,
-        .y=a.z*b.x-a.x*b.z,
-        .z=a.x*b.y-a.y*b.x
     };
 }
 
@@ -224,7 +253,7 @@ static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triang
     float a2 = TriangleDoubleArea(t2);
     float a3 = TriangleDoubleArea(t3);
 
-    if (a < (a1 + a2 + a3) - 1e-3) {
+    if (a < (a1 + a2 + a3) - 1e-5) {
         return Vec3(-1, -1, -1);
     }
 
@@ -251,6 +280,63 @@ static inline struct HitPoint IntersectionTriangle(struct Ray ray, struct Triang
         hit.hit = false;
     }
     return hit;
+}
+
+static inline struct AABB GetBoundingBox(struct Triangle *triangle, int count) {
+    struct AABB box;
+    box.min = triangle->vertices.c[0];
+    box.max = triangle->vertices.c[0];
+
+    for (int i = 0; i < count; i++) {
+        for (int j = 0; j < 3; j++) {
+            box.min.x = fmin(triangle[i].vertices.c[j].x, box.min.x);
+            box.min.y = fmin(triangle[i].vertices.c[j].y, box.min.y);
+            box.min.z = fmin(triangle[i].vertices.c[j].z, box.min.z);
+            box.max.x = fmax(triangle[i].vertices.c[j].x, box.max.x);
+            box.max.y = fmax(triangle[i].vertices.c[j].y, box.max.y);
+            box.max.z = fmax(triangle[i].vertices.c[j].z, box.max.z);
+        }
+    }
+    box.min.x += -1e-3;
+    box.min.y += -1e-3;
+    box.min.z += -1e-3;
+    box.max.x += 1e-3;
+    box.max.y += 1e-3;
+    box.max.z += 1e-3;
+
+    return box;
+}
+
+static inline struct Vec3 GetBarycenter(struct Triangle *triangle, int count) {
+    struct Vec3 barycenter = {0};
+    for (int i = 0; i < count; i++) {
+        barycenter.x += triangle[i].vertices.c[0].x;
+        barycenter.x += triangle[i].vertices.c[1].x;
+        barycenter.x += triangle[i].vertices.c[2].x;
+        barycenter.y += triangle[i].vertices.c[0].y;
+        barycenter.y += triangle[i].vertices.c[1].y;
+        barycenter.y += triangle[i].vertices.c[2].y;
+        barycenter.z += triangle[i].vertices.c[0].z;
+        barycenter.z += triangle[i].vertices.c[1].z;
+        barycenter.z += triangle[i].vertices.c[2].z;
+    }
+    barycenter.x /= count*3;
+    barycenter.y /= count*3;
+    barycenter.z /= count*3;
+    return barycenter;
+}
+
+static inline bool IntersectionAABB(struct Ray ray, struct AABB aabb) {
+    struct Vec3 vtmin = Vec3Div(Vec3Sub(aabb.min, ray.origin), ray.direction);
+    struct Vec3 vtmax = Vec3Div(Vec3Sub(aabb.max, ray.origin), ray.direction);
+
+    struct Vec3 tmin = Vec3Min(vtmin, vtmax);
+    struct Vec3 tmax = Vec3Max(vtmin, vtmax);
+
+    float enter = fmax(tmin.x, fmax(tmin.y, tmin.z));
+    float exit = fmin(tmax.x, fmin(tmax.y, tmax.z));
+
+    return exit > 0.0 && exit > enter;
 }
 
 #endif //RAYMEOWER_MEOWMATH_H

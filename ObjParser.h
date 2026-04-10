@@ -13,11 +13,11 @@ struct Mesh {
 };
 
 static inline struct Mesh ImportObj(const char *path){
-    struct Vec3 *vertices = (struct Vec3 *)malloc(sizeof(struct Vec3) * 4096);
+    struct Vec3 *vertices = (struct Vec3 *)malloc(sizeof(struct Vec3) * 8192);
     int vertexCount = 0;
 
     struct Mesh m;
-    m.triangles = (struct Triangle *)malloc(sizeof(struct Triangle) * 4096);
+    m.triangles = (struct Triangle *)malloc(sizeof(struct Triangle) * 30000);
     int triangleCount = 0;
 
     FILE *file = fopen(path, "r");
