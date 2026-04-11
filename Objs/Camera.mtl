@@ -239,7 +239,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-#map_Kd /home/aurora/Nextcloud/Modelli 3D/Blender/bedroom/Textures/Floor.png
+map_Kd Textures/Floor.png
 
 newmtl Keyboard
 Ns 74.499977
@@ -299,7 +299,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-#map_Kd /home/aurora/Nextcloud/Modelli 3D/Blender/bedroom/Textures/poster.png
+map_Kd Textures/poster.png
 
 newmtl Material.002
 Ns 678.434753
@@ -309,14 +309,14 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-#map_Kd /home/aurora/Nextcloud/Modelli 3D/Blender/bedroom/Textures/Poster3.png
+map_Kd Textures/Poster3.png
 
 newmtl Material.003
 Ns 360.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
 Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.000000 0.000000
+Ke 10.000000 1.150000 8.960000
 Ni 1.000000
 d 1.000000
 illum 2
@@ -389,7 +389,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-#map_Kd /home/aurora/Nextcloud/Modelli 3D/Blender/bedroom/Textures/Poster2.png
+map_Kd Textures/Poster2.png
 
 newmtl Radiator
 Ns 785.835083
