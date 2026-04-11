@@ -2,6 +2,12 @@
 #define RAYMEOWER_MEOWMATH_H
 #include <math.h>
 #include <stdint.h>
+#include <SDL3_image/SDL_image.h>
+
+struct Vec2 {
+    float x;
+    float y;
+};
 
 struct Vec3 {
     float x;
@@ -18,6 +24,7 @@ struct Material {
     struct Vec3 color;
     struct Vec3 reflectionColor;
     struct Vec3 emissionColor;
+    SDL_Surface *texture;
 };
 
 struct Sphere {
@@ -39,6 +46,7 @@ struct Plane {
 
 struct Triangle {
     struct Mat3 vertices;
+    struct Vec2 uv[3];
     uint16_t materialIndex;
 };
 
@@ -56,6 +64,7 @@ struct HitPoint {
     bool hit;
     struct Vec3 point;
     struct Vec3 normal;
+    struct Vec3 barycentric;
     float distance;
 };
 
@@ -69,6 +78,28 @@ static inline struct Vec3 Vec3(float x, float y, float z) {
         .x=x,
         .y=y,
         .z=z
+    };
+}
+
+static inline struct Vec2 Vec2(float x, float y) {
+    return (struct Vec2){
+        .x=x,
+        .y=y
+    };
+}
+
+static inline struct Vec3 Vec2ToVec3(struct Vec2 a) {
+    return (struct Vec3){
+        .x=a.x,
+        .y=a.y,
+        .z=0
+    };
+}
+
+static inline struct Vec2 Vec3ToVec2(struct Vec3 a) {
+    return (struct Vec2){
+        .x=a.x,
+        .y=a.y
     };
 }
 
@@ -250,9 +281,9 @@ static inline struct Vec3 TriangleNormal(struct Triangle t) {
 
 static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triangle t) {
     float a = TriangleDoubleArea(t);
-    struct Triangle t1 = {.vertices = {t.vertices.c[0], t.vertices.c[1], p}};
-    struct Triangle t2 = {.vertices = {t.vertices.c[1], t.vertices.c[2], p}};
-    struct Triangle t3 = {.vertices = {t.vertices.c[0], t.vertices.c[2], p}};
+    struct Triangle t1 = {.vertices = {t.vertices.c[1], t.vertices.c[2], p}};
+    struct Triangle t2 = {.vertices = {t.vertices.c[0], t.vertices.c[2], p}};
+    struct Triangle t3 = {.vertices = {t.vertices.c[0], t.vertices.c[1], p}};
     float a1 = TriangleDoubleArea(t1);
     float a2 = TriangleDoubleArea(t2);
     float a3 = TriangleDoubleArea(t3);
@@ -279,8 +310,8 @@ static inline struct HitPoint IntersectionTriangle(struct Ray ray, struct Triang
         return hit;
     }
 
-    struct Vec3 barycentric = PointTriangleIntersection(hit.point, triangle);
-    if (barycentric.x < 0) {
+    hit.barycentric = PointTriangleIntersection(hit.point, triangle);
+    if (hit.barycentric.x < 0) {
         hit.hit = false;
     }
     return hit;
@@ -341,6 +372,28 @@ static inline bool IntersectionAABB(struct Ray ray, struct AABB aabb) {
     float exit = fmin(tmax.x, fmin(tmax.y, tmax.z));
 
     return exit > 0.0 && exit > enter;
+}
+
+static inline struct Vec3 InterpolateAttribute(struct HitPoint hit, struct Vec3 v[3]) {
+    v[0] = Vec3Mul(v[0], hit.barycentric.x);
+    v[1] = Vec3Mul(v[1], hit.barycentric.y);
+    v[2] = Vec3Mul(v[2], hit.barycentric.z);
+    return Vec3Add(v[0], Vec3Add(v[1], v[2]));
+}
+
+static inline struct Vec3 SampleTexture(SDL_Surface *surface, struct Vec2 uv) {
+    uint32_t x = uv.x * surface->w;
+    uint32_t y = (1.0-uv.y) * surface->h;
+    x %= surface->w;
+    y %= surface->h;
+
+    const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surface->format);
+    int pixelSize = details->bytes_per_pixel;
+    void *pixel = surface->pixels + x * pixelSize + y * surface->pitch;
+    uint32_t packedPixel = *(uint32_t*)pixel;
+    uint8_t rgb[3];
+    SDL_GetRGB(packedPixel, details, NULL, &rgb[0], &rgb[1], &rgb[2]);
+    return Vec3(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0);
 }
 
 #endif //RAYMEOWER_MEOWMATH_H

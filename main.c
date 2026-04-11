@@ -11,13 +11,13 @@ static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
-#define WINDOW_WIDTH 320
-#define WINDOW_HEIGHT 240
+#define WINDOW_WIDTH 256
+#define WINDOW_HEIGHT 144
 
 int samples = 1;
-int depth = 1;
+int depth = 2;
 
-int renderSamples = 256;
+int renderSamples = 512;
 int renderDepth = 4;
 
 struct Vec3 cameraPos = {0, 1, 0};
@@ -30,7 +30,7 @@ struct BVHNode *bvhRoot;
 struct Sun sun = {.dir={-1, -1, -0.5}, .color = {5, 5, 5}};
 
 struct PointLight lights[] = {
-    //{.pos= {0, 3, 0}, .color = {5.0/3, 4.5/3, 4.0/3}}
+    {.pos= {0, 3, 0}, .color = {5.0/3, 4.5/3, 4.0/3}}
 };
 
 struct InputStates {
@@ -177,8 +177,20 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
     struct Triangle *triangleID = NULL;
     hit = BVHHit(r, bvhRoot, 0, &index, &triangleID);
     if (hit.hit) {
+        struct Vec3 hitcolor = scene.material[index].color;
+        if (scene.material[index].texture != NULL) {
+            struct Vec3 uvs[3];
+            uvs[0] = Vec2ToVec3(triangleID->uv[0]);
+            uvs[1] = Vec2ToVec3(triangleID->uv[1]);
+            uvs[2] = Vec2ToVec3(triangleID->uv[2]);
+            struct Vec2 uv = Vec3ToVec2(InterpolateAttribute(hit, uvs));
+            hitcolor = SampleTexture(scene.material[index].texture, uv);
+            //hitcolor.x = uv.x;
+            //hitcolor.y = uv.y;
+            //hitcolor.z = 0;
+        }
         // Apply sun contribution
-        color = scene.material[index].color;
+        color = hitcolor;
         float d = Vec3Dot(sun.dir, hit.normal);
         if (d < 0)
             d = 0;
@@ -202,7 +214,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
 
         // Apply lights contribution
         for (int i = 0; i < sizeof(lights)/sizeof(lights[0]); i++) {
-            struct Vec3 tempColor = scene.material[index].color;
+            struct Vec3 tempColor = hitcolor;
             struct Vec3 incidentVector = Vec3Sub(hit.point, lights[i].pos);
             float distance = Vec3Length(incidentVector);
             incidentVector = Vec3Normalize(incidentVector);
@@ -246,9 +258,9 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
         diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
         struct Vec3 refDiffuseColor = shade(diffuseRay, depth - 1);
-        color.x += refDiffuseColor.x * scene.material[index].color.x;
-        color.y += refDiffuseColor.y * scene.material[index].color.y;
-        color.z += refDiffuseColor.z * scene.material[index].color.z;
+        color.x += refDiffuseColor.x * hitcolor.x;
+        color.y += refDiffuseColor.y * hitcolor.y;
+        color.z += refDiffuseColor.z * hitcolor.z;
 
         // Apply emission
         color.x += scene.material[index].emissionColor.x;
