@@ -80,7 +80,6 @@ static inline struct BVHNode *BuildBVH_rec(struct Triangle *triangles, int start
     if (splitPoint == start || splitPoint == end) {
         splitPoint = (start + end) / 2;
     }
-    printf("%d\n", depth);
     node->left = BuildBVH_rec(triangles, start, splitPoint, depth+1);
     node->right = BuildBVH_rec(triangles, splitPoint, end, depth+1);
     return node;

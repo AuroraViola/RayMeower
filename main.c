@@ -24,21 +24,13 @@ struct Vec3 cameraPos = {0, 1, 0};
 
 struct Vec3 pixel[WINDOW_WIDTH][WINDOW_HEIGHT];
 
-struct Material m[] = {
-    {.color = {0.8, 0.8, 0.8}, .reflectionColor = {0.0, 0.0, 0.0}},
-    {.color = {0.4, 0.4, 0.4}, .reflectionColor = {0.8, 0.8, 0.8}},
-    {.color = {0.9, 0.2, 0.2}, .reflectionColor = {0.0, 0.0, 0.0}},
-    {.color = {0.2, 0.9, 0.2}, .reflectionColor = {0.0, 0.0, 0.0}},
-    {.color = {0.2, 0.2, 0.9}, .reflectionColor = {0.0, 0.0, 0.0}},
-};
-
 struct Mesh scene;
 struct BVHNode *bvhRoot;
 
-struct Sun sun = {.dir={1, -1, -0.5}, .color = {2, 2, 2}};
+struct Sun sun = {.dir={-1, -1, -0.5}, .color = {5, 5, 5}};
 
 struct PointLight lights[] = {
-    {.pos = {0, 3, 0}, .color = {5, 4.5, 4}}
+    {.pos= {0, 3, 0}, .color = {5.0/3, 4.5/3, 4.0/3}}
 };
 
 struct InputStates {
@@ -72,8 +64,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     sun.dir = Vec3Normalize(sun.dir);
 
-    scene = ImportObj("../Objs/Scene1.obj", 0);
-    scene.material = &m[0];
+    scene = ImportObj("../Objs/Camera.obj");
     bvhRoot = BuildBVH(scene.triangles, scene.triangleCount);
 
     return SDL_APP_CONTINUE;
@@ -187,7 +178,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
     hit = BVHHit(r, bvhRoot, 0, &index, &triangleID);
     if (hit.hit) {
         // Apply sun contribution
-        color = m[index].color;
+        color = scene.material[index].color;
         float d = Vec3Dot(sun.dir, hit.normal);
         if (d < 0)
             d = 0;
@@ -211,7 +202,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
 
         // Apply lights contribution
         for (int i = 0; i < sizeof(lights)/sizeof(lights[0]); i++) {
-            struct Vec3 tempColor = m[index].color;
+            struct Vec3 tempColor = scene.material[index].color;
             struct Vec3 incidentVector = Vec3Sub(hit.point, lights[i].pos);
             float distance = Vec3Length(incidentVector);
             incidentVector = Vec3Normalize(incidentVector);
@@ -242,18 +233,18 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
         reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
         struct Vec3 refColor = shade(reflectionRay, depth - 1);
-        color.x += refColor.x * m[index].reflectionColor.x;
-        color.y += refColor.y * m[index].reflectionColor.y;
-        color.z += refColor.z * m[index].reflectionColor.z;
+        color.x += refColor.x * scene.material[index].reflectionColor.x;
+        color.y += refColor.y * scene.material[index].reflectionColor.y;
+        color.z += refColor.z * scene.material[index].reflectionColor.z;
 
         // Apply diffuse global illumination
         struct Ray diffuseRay = {0};
         diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
         diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
         struct Vec3 refDiffuseColor = shade(diffuseRay, depth - 1);
-        color.x += refDiffuseColor.x * m[index].color.x;
-        color.y += refDiffuseColor.y * m[index].color.y;
-        color.z += refDiffuseColor.z * m[index].color.z;
+        color.x += refDiffuseColor.x * scene.material[index].color.x;
+        color.y += refDiffuseColor.y * scene.material[index].color.y;
+        color.z += refDiffuseColor.z * scene.material[index].color.z;
     }
     return color;
 }
