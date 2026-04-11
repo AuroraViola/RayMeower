@@ -27,9 +27,14 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
             materials[(*materialCount)-1].name = malloc(256);
             sscanf(current_line, "newmtl %s", materials[(*materialCount)-1].name);
             materials[(*materialCount)-1].color = Vec3(1.0, 1.0, 1.0);
+            materials[(*materialCount)-1].reflectionColor = Vec3(0.0, 0.0, 0.0);
+            materials[(*materialCount)-1].emissionColor = Vec3(0.0, 0.0, 0.0);
         }
         if (begins("Kd", current_line) == 0) {
             sscanf(current_line, "Kd %f %f %f", &materials[(*materialCount)-1].color.x, &materials[(*materialCount)-1].color.y, &materials[(*materialCount)-1].color.z);
+        }
+        if (begins("Ke", current_line) == 0) {
+            sscanf(current_line, "Ke %f %f %f", &materials[(*materialCount)-1].emissionColor.x, &materials[(*materialCount)-1].emissionColor.y, &materials[(*materialCount)-1].emissionColor.z);
         }
     }
     return materials;

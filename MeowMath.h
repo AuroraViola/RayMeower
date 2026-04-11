@@ -17,6 +17,7 @@ struct Material {
     const char *name;
     struct Vec3 color;
     struct Vec3 reflectionColor;
+    struct Vec3 emissionColor;
 };
 
 struct Sphere {

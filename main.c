@@ -15,7 +15,7 @@ static Uint64 last_time = 0;
 #define WINDOW_HEIGHT 240
 
 int samples = 1;
-int depth = 2;
+int depth = 1;
 
 int renderSamples = 256;
 int renderDepth = 4;
@@ -30,7 +30,7 @@ struct BVHNode *bvhRoot;
 struct Sun sun = {.dir={-1, -1, -0.5}, .color = {5, 5, 5}};
 
 struct PointLight lights[] = {
-    {.pos= {0, 3, 0}, .color = {5.0/3, 4.5/3, 4.0/3}}
+    //{.pos= {0, 3, 0}, .color = {5.0/3, 4.5/3, 4.0/3}}
 };
 
 struct InputStates {
@@ -228,14 +228,18 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         }
 
         // Apply Reflections
-        struct Ray reflectionRay = {0};
-        struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
-        reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
-        reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
-        struct Vec3 refColor = shade(reflectionRay, depth - 1);
-        color.x += refColor.x * scene.material[index].reflectionColor.x;
-        color.y += refColor.y * scene.material[index].reflectionColor.y;
-        color.z += refColor.z * scene.material[index].reflectionColor.z;
+        if (scene.material[index].reflectionColor.x != 0 &&
+            scene.material[index].reflectionColor.y != 0 &&
+            scene.material[index].reflectionColor.z != 0) {
+            struct Ray reflectionRay = {0};
+            struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
+            reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
+            reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
+            struct Vec3 refColor = shade(reflectionRay, depth - 1);
+            color.x += refColor.x * scene.material[index].reflectionColor.x;
+            color.y += refColor.y * scene.material[index].reflectionColor.y;
+            color.z += refColor.z * scene.material[index].reflectionColor.z;
+        }
 
         // Apply diffuse global illumination
         struct Ray diffuseRay = {0};
@@ -245,6 +249,11 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         color.x += refDiffuseColor.x * scene.material[index].color.x;
         color.y += refDiffuseColor.y * scene.material[index].color.y;
         color.z += refDiffuseColor.z * scene.material[index].color.z;
+
+        // Apply emission
+        color.x += scene.material[index].emissionColor.x;
+        color.y += scene.material[index].emissionColor.y;
+        color.z += scene.material[index].emissionColor.z;
     }
     return color;
 }
