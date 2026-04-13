@@ -56,12 +56,12 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
 }
 
 static inline struct Mesh ImportObj(const char *path){
-    struct Vec3 *vertices = (struct Vec3 *)malloc(sizeof(struct Vec3) * 8192);
-    struct Vec2 *uv = (struct Vec2 *)malloc(sizeof(struct Vec2) * 8192);
+    struct Vec3 *vertices = (struct Vec3 *)malloc(sizeof(struct Vec3) * 819200);
+    struct Vec2 *uv = (struct Vec2 *)malloc(sizeof(struct Vec2) * 819200);
     int vertexCount = 0;
     int uvCount = 0;
     struct Mesh m;
-    m.triangles = (struct Triangle *)malloc(sizeof(struct Triangle) * 30000);
+    m.triangles = (struct Triangle *)malloc(sizeof(struct Triangle) * 1000000);
     int triangleCount = 0;
     int currentMaterial = 0;
 
@@ -81,9 +81,10 @@ static inline struct Mesh ImportObj(const char *path){
                 }
                 break;
             case 'f':
-                int indexs[3];
-                int uvIndex[3];
-                sscanf(current_line, "f %d/%d/%*d %d/%d/%*d %d/%d/%*d", &indexs[0], &uvIndex[0], &indexs[1], &uvIndex[1], &indexs[2], &uvIndex[2]);
+                int indexs[3] = {0};
+                int uvIndex[3] = {0};
+                if (sscanf(current_line, "f %d/%d/%*d %d/%d/%*d %d/%d/%*d", &indexs[0], &uvIndex[0], &indexs[1], &uvIndex[1], &indexs[2], &uvIndex[2]) != 6);
+                    sscanf(current_line, "f %d//%*d %d//%*d %d//%*d", &indexs[0], &indexs[1], &indexs[2]);
                 m.triangles[triangleCount].vertices.c[0] = vertices[indexs[0]-1];
                 m.triangles[triangleCount].vertices.c[1] = vertices[indexs[1]-1];
                 m.triangles[triangleCount].vertices.c[2] = vertices[indexs[2]-1];
