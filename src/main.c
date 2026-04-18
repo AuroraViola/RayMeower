@@ -5,24 +5,18 @@
 #include "MeowMath.h"
 #include "ObjParser.h"
 #include "bvh.h"
+#include "nkui.h"
 
 /* We will use this renderer to draw into this window every frame. */
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
-#define WINDOW_WIDTH 320
-#define WINDOW_HEIGHT 240
-
-int samples = 1;
-int depth = 2;
-
-int renderSamples = 512;
-int renderDepth = 4;
+struct Settings s;
 
 struct Vec3 cameraPos = {0, 1, 0};
 
-struct Vec3 pixel[WINDOW_WIDTH][WINDOW_HEIGHT];
+static SDL_Texture *renderTexture = NULL;
 
 struct Mesh scene;
 struct BVHNode *bvhRoot;
@@ -41,6 +35,7 @@ struct InputStates {
     float up;
     float mouseVertical;
     float mouseHorizontal;
+    bool menu;
 };
 
 struct InputStates inputStates = {0};
@@ -53,12 +48,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         return SDL_APP_FAILURE;
     }
 
-    if (!SDL_CreateWindowAndRenderer("RayMeower", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+    if (!SDL_CreateWindowAndRenderer("RayMeower", 320, 240, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
         SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    SDL_SetRenderLogicalPresentation(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     SDL_SetWindowRelativeMouseMode(window, true);
+    SDL_SetWindowResizable(window, true);
+
+    renderTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 3840, 2160);
+    SDL_SetTextureScaleMode(renderTexture, SDL_SCALEMODE_NEAREST);
 
     last_time = SDL_GetTicks();
 
@@ -66,6 +64,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     scene = ImportObj("../Objs/Camera.obj");
     bvhRoot = BuildBVH(scene.triangles, scene.triangleCount);
+
+    NkUiInit(window, renderer);
+
+    s.samples = 1;
+    s.depth = 2;
+    s.renderSamples = 512;
+    s.renderDepth = 4;
+    s.skyColor = Vec3(0.5, 0.5, 0.8);
+    s.width = 320;
+    s.height = 240;
+    s.renderWidth = 1440;
+    s.renderHeight = 1080;
 
     return SDL_APP_CONTINUE;
 }
@@ -100,17 +110,24 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             inputStates.up -= 1;
         }
         if (inputStates.keys[SDLK_L]) {
-            depth = renderDepth;
-            samples = renderSamples;
+            s.depth = s.renderDepth;
+            s.samples = s.renderSamples;
+        }
+        if (inputStates.keys[SDLK_ESCAPE]) {
+            inputStates.menu = !inputStates.menu;
+            SDL_SetWindowRelativeMouseMode(window, !inputStates.menu);
         }
     }
-    if (event->type == SDL_EVENT_MOUSE_MOTION) {
+    if (event->type == SDL_EVENT_MOUSE_MOTION && !inputStates.menu) {
         inputStates.mouseVertical += event->motion.yrel * 0.001;
         inputStates.mouseHorizontal += event->motion.xrel * 0.001;
     }
     if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;
     }
+
+    nk_sdl_handle_event(ctx, event);
+
     return SDL_APP_CONTINUE;
 }
 
@@ -170,7 +187,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
     if (depth == 0) {
         return color;
     }
-    color = Vec3(0.5, 0.5, 0.8);
+    color = s.skyColor;
     struct HitPoint hit = {0};
     //index = calculateHit(r, &hit);
     int index = -1;
@@ -185,9 +202,6 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
             uvs[2] = Vec2ToVec3(triangleID->uv[2]);
             struct Vec2 uv = Vec3ToVec2(InterpolateAttribute(hit, uvs));
             hitcolor = SampleTexture(scene.material[index].texture, uv);
-            //hitcolor.x = uv.x;
-            //hitcolor.y = uv.y;
-            //hitcolor.z = 0;
         }
         // Apply sun contribution
         color = hitcolor;
@@ -271,6 +285,8 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
+    NkUiDraw(&s);
+
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
 
@@ -292,29 +308,39 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     posDelta = Mat3Vec3Mul(rot, posDelta);
     cameraPos = Vec3Add(cameraPos, posDelta);
 
+    SDL_Rect r = {0, 0, s.width, s.height};
+    SDL_FRect fr = {0, 0, s.width, s.height};
+    uint32_t *pixels;
+    int pitch;
+
+    SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);
 
     #pragma omp parallel for
-    for (int x = 0; x < WINDOW_WIDTH; x++) {
-        for (int y = 0; y < WINDOW_HEIGHT; y++) {
+    for (int x = 0; x < s.width; x++) {
+        for (int y = 0; y < s.height; y++) {
             struct Ray r;
             r.origin = cameraPos;
 
             struct Vec3 color = {0};
-            for (int i = 0; i < samples; i++) {
+            for (int i = 0; i < s.samples; i++) {
                 struct Vec3 rv2 = {0};
                 rv2.x = (float)SDL_rand(1000000) / 1000000.0f;
                 rv2.y = (float)SDL_rand(1000000) / 1000000.0f;
+                if (s.samples == 1) {
+                    rv2.x = 0;
+                    rv2.y = 0;
+                }
 
-                r.direction.x = ((float)x + rv2.x) / (float)WINDOW_WIDTH - 0.5;
-                r.direction.y = ((float)y + rv2.y) / (float)WINDOW_HEIGHT - 0.5;
-                r.direction.y *= -(float)WINDOW_HEIGHT/(float)WINDOW_WIDTH;
+                r.direction.x = ((float)x + rv2.x) / (float)s.width - 0.5;
+                r.direction.y = ((float)y + rv2.y) / (float)s.height - 0.5;
+                r.direction.y *= -(float)s.height/(float)s.width;
                 r.direction.z = 0.5;
                 r.direction = Vec3Normalize(r.direction);
                 r.direction = Mat3Vec3Mul(rot, r.direction);
-                color = Vec3Add(color, shade(r, depth));
+                color = Vec3Add(color, shade(r, s.depth));
             }
 
-            color = Vec3Mul(color, 1.0/(float)samples);
+            color = Vec3Mul(color, 1.0/(float)s.samples);
 
             float exposure = 1.5;
             color.x = 1 - exp(-color.x * exposure);
@@ -331,18 +357,18 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
                 color.z = 1;
             }
 
-            pixel[x][y] = color;
+            ((uint32_t*)((void*)pixels + y * pitch))[x] = 0xff | ((uint32_t)(color.x*255)) << 24 | ((uint32_t)(color.y*255)) << 16 | ((uint32_t)(color.z*255)) << 8;
         }
     }
 
-    for (int x = 0; x < WINDOW_WIDTH; x++) {
-        for (int y = 0; y < WINDOW_HEIGHT; y++) {
-            SDL_SetRenderDrawColor(renderer, pixel[x][y].x*255, pixel[x][y].y*255,  pixel[x][y].z*255, SDL_ALPHA_OPAQUE);
-            SDL_RenderPoint(renderer, (float)x, (float)y);
-        }
-    }
+    SDL_UnlockTexture(renderTexture);
+    SDL_RenderTexture(renderer, renderTexture, &fr, NULL);
+    nk_sdl_render(ctx, AA);
+    nk_sdl_update_TextInput(ctx);
 
     SDL_RenderPresent(renderer);
+
+    nk_input_begin(ctx);
 
     return SDL_APP_CONTINUE;
 }
