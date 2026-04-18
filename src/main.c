@@ -11,8 +11,8 @@ static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
-#define WINDOW_WIDTH 256
-#define WINDOW_HEIGHT 144
+#define WINDOW_WIDTH 320
+#define WINDOW_HEIGHT 240
 
 int samples = 1;
 int depth = 2;
@@ -30,7 +30,7 @@ struct BVHNode *bvhRoot;
 struct Sun sun = {.dir={-1, -1, -0.5}, .color = {5, 5, 5}};
 
 struct PointLight lights[] = {
-    {.pos= {0, 3, 0}, .color = {5.0/3, 4.5/3, 4.0/3}}
+    {.pos= {0, 2, 0}, .color = {5.0/3, 4.5/3, 4.0/3}}
 };
 
 struct InputStates {
@@ -277,6 +277,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     uint64_t t = SDL_GetTicks();
     float dt = (float)t - (float)last_time;
     dt /= 1000.0f;
+    if (dt > 100.0f)
+        dt = 100.0f;
     last_time = t;
     float speed = 3.0f;
 
