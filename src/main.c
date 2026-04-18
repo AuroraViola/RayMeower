@@ -17,6 +17,9 @@ struct Settings s;
 struct Vec3 cameraPos = {0, 1, 0};
 
 static SDL_Texture *renderTexture = NULL;
+static uint32_t pixel[2][3840][2160];
+static int currentRender = 0;
+static SDL_Mutex *mutex;
 
 struct Mesh scene;
 struct BVHNode *bvhRoot;
@@ -39,6 +42,8 @@ struct InputStates {
 };
 
 struct InputStates inputStates = {0};
+
+static int SDLCALL RenderThread(void *ptr);
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_SetAppMetadata("RayMeower", "0.0.1", "io.auroraviola.raymeower");
@@ -78,6 +83,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     s.renderWidth = 1440;
     s.renderHeight = 1080;
     s.renderMode = false;
+
+    mutex = SDL_CreateMutex();
+
+    SDL_Thread *renderThread = SDL_CreateThread(RenderThread, "RenderThread", NULL);
 
     return SDL_APP_CONTINUE;
 }
@@ -282,7 +291,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
     return color;
 }
 
-static inline struct Vec3 renderPixel(int width, int height, int x, int y, struct Mat3 rot, int samples, int depth) {
+static inline struct Vec3 renderPixel(int width, int height, int x, int y, struct Vec3 cameraPos, struct Mat3 rot, int samples, int depth) {
     struct Ray r;
     r.origin = cameraPos;
     struct Vec3 color = {0};
@@ -337,58 +346,22 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         height = s.renderHeight;
         width = s.renderWidth;
     }
-    SDL_Rect r = {0, 0, width, height};
     SDL_FRect fr = {0, 0, width, height};
+    SDL_Rect r = {0, 0, width, height};
+
+
     uint32_t *pixels;
     int pitch;
-
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);
-
-    #pragma omp parallel for
+    SDL_LockMutex(mutex);
     for (int x = 0; x < width; x++) {
         for (int y = 0; y < height; y++) {
-            struct Vec3 color = {0};
-            if (s.renderMode) {
-                color = renderPixel(width, height, x, y, rot, s.renderSamples, s.renderDepth);
-            }
-            else {
-                color = renderPixel(width, height, x, y, rot, s.samples, s.depth);
-            }
-
-            float exposure = 1.5;
-            color.x = 1 - exp(-color.x * exposure);
-            color.y = 1 - exp(-color.y * exposure);
-            color.z = 1 - exp(-color.z * exposure);
-
-            if (color.x > 1) {
-                color.x = 1;
-            }
-            if (color.y > 1) {
-                color.y = 1;
-            }
-            if (color.z > 1) {
-                color.z = 1;
-            }
-
-            ((uint32_t*)((void*)pixels + y * pitch))[x] = 0xff | ((uint32_t)(color.x*255)) << 24 | ((uint32_t)(color.y*255)) << 16 | ((uint32_t)(color.z*255)) << 8;
+            ((uint32_t*)((void*)pixels + y * pitch))[x] = pixel[s.renderMode ? currentRender : !currentRender][x][y];
         }
     }
-
-    if (s.renderMode) {
-        FILE *f = fopen("/tmp/image.ppm", "w");         // Write image to PPM file.
-        fprintf(f, "P3\n%d %d\n%d\n", width, height, 255);
-        for (int i = 0; i < width * height; i++) {
-            int x = i % width;
-            int y = i / width;
-            uint32_t color = ((uint32_t*)((void*)pixels + y * pitch))[x];
-            fprintf(f,"%d %d %d ", (color >> 24) & 0xff, (color >> 16) & 0xff, (color >> 8) & 0xff);
-        }
-        fclose(f);
-        s.renderMode = false;
-    }
-
+    SDL_UnlockMutex(mutex);
     SDL_UnlockTexture(renderTexture);
-    SDL_RenderTexture(renderer, renderTexture, &fr, NULL);
+    SDL_RenderTexture(renderer, &renderTexture[0], &fr, NULL);
     nk_sdl_render(ctx, AA);
     nk_sdl_update_TextInput(ctx);
 
@@ -400,4 +373,69 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+}
+
+static int SDLCALL RenderThread(void *ptr) {
+    while (true) {
+        SDL_LockMutex(mutex);
+        bool renderMode = s.renderMode;
+        currentRender = !currentRender;
+        int currentTexture = currentRender;
+        struct Mat3 rot = RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0);
+        int height = s.height;
+        int width = s.width;
+        if (renderMode) {
+            height = s.renderHeight;
+            width = s.renderWidth;
+        }
+        uint32_t *pixels;
+        int pitch;
+
+        struct Vec3 cameraPosBuf = cameraPos;
+
+        SDL_UnlockMutex(mutex);
+
+        #pragma omp parallel for
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                struct Vec3 color = {0};
+                if (renderMode) {
+                    color = renderPixel(width, height, x, y, cameraPosBuf, rot, s.renderSamples, s.renderDepth);
+                }
+                else {
+                    color = renderPixel(width, height, x, y, cameraPosBuf, rot, s.samples, s.depth);
+                }
+
+                float exposure = 1.5;
+                color.x = 1 - exp(-color.x * exposure);
+                color.y = 1 - exp(-color.y * exposure);
+                color.z = 1 - exp(-color.z * exposure);
+
+                if (color.x > 1) {
+                    color.x = 1;
+                }
+                if (color.y > 1) {
+                    color.y = 1;
+                }
+                if (color.z > 1) {
+                    color.z = 1;
+                }
+
+                pixel[currentTexture][x][y] = 0xff | ((uint32_t)(color.x*255)) << 24 | ((uint32_t)(color.y*255)) << 16 | ((uint32_t)(color.z*255)) << 8;
+            }
+        }
+
+        if (renderMode) {
+            FILE *f = fopen("/tmp/image.ppm", "w");         // Write image to PPM file.
+            fprintf(f, "P3\n%d %d\n%d\n", width, height, 255);
+            for (int i = 0; i < width * height; i++) {
+                int x = i % width;
+                int y = i / width;
+                uint32_t color = pixel[currentTexture][x][y];
+                fprintf(f,"%d %d %d ", (color >> 24) & 0xff, (color >> 16) & 0xff, (color >> 8) & 0xff);
+            }
+            fclose(f);
+            s.renderMode = false;
+        }
+    }
 }
