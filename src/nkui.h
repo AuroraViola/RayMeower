@@ -73,6 +73,8 @@ struct Settings {
     int renderHeight;
     int renderWidth;
 
+    bool renderMode;
+
     union {
         struct Vec3 skyColor;
         struct nk_colorf skyColorNk;
@@ -115,7 +117,7 @@ void NkUiDraw(struct Settings *settings) {
     nk_input_end(ctx);
 
     /* GUI */
-    if (nk_begin(ctx, "Demo", nk_rect(50, 50, 250, 450),
+    if (nk_begin(ctx, "Settings", nk_rect(50, 50, 250, 460),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
         {
@@ -129,14 +131,15 @@ void NkUiDraw(struct Settings *settings) {
 
         nk_label(ctx, "Render settings", NK_TEXT_CENTERED);
         if (nk_button_label(ctx, "Render Image")) {
-            SDL_Log("Unimplemented");
+            settings->renderMode = true;
         }
         nk_property_int(ctx, "Resolution X: ", 64, &settings->renderWidth, 3840, 1, 1);
         nk_property_int(ctx, "Resolution Y: ",  64, &settings->renderHeight, 2160, 1, 1);
         nk_property_int(ctx, "Samples: ", 1, &settings->renderSamples, 1024, 1, 1);
         nk_property_int(ctx, "Depth: ", 1, &settings->renderDepth, 8, 1, 1);
 
-        nk_layout_row_dynamic(ctx, 20, 1);
+
+        nk_label(ctx, "Scene settings", NK_TEXT_CENTERED);
         nk_label(ctx, "Sky Color:", NK_TEXT_LEFT);
         nk_layout_row_dynamic(ctx, 25, 1);
         if (nk_combo_begin_color(ctx, nk_rgb_cf(settings->skyColorNk), nk_vec2(nk_widget_width(ctx),400))) {

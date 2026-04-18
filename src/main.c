@@ -67,15 +67,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     NkUiInit(window, renderer);
 
+    inputStates.menu = false;
     s.samples = 1;
     s.depth = 2;
     s.renderSamples = 512;
     s.renderDepth = 4;
     s.skyColor = Vec3(0.5, 0.5, 0.8);
-    s.width = 320;
-    s.height = 240;
+    s.width = 160;
+    s.height = 144;
     s.renderWidth = 1440;
     s.renderHeight = 1080;
+    s.renderMode = false;
 
     return SDL_APP_CONTINUE;
 }
@@ -108,10 +110,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
         }
         if (inputStates.shift) {
             inputStates.up -= 1;
-        }
-        if (inputStates.keys[SDLK_L]) {
-            s.depth = s.renderDepth;
-            s.samples = s.renderSamples;
         }
         if (inputStates.keys[SDLK_ESCAPE]) {
             inputStates.menu = !inputStates.menu;
@@ -182,7 +180,7 @@ static inline int calculateHit(struct Ray r, struct HitPoint *hit) {
     return index;
 }
 
-static inline struct Vec3 shade(struct Ray r, int depth) {
+static inline struct Vec3 Shade(struct Ray r, int depth) {
     struct Vec3 color = {0};
     if (depth == 0) {
         return color;
@@ -261,7 +259,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
             struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
             reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
             reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
-            struct Vec3 refColor = shade(reflectionRay, depth - 1);
+            struct Vec3 refColor = Shade(reflectionRay, depth - 1);
             color.x += refColor.x * scene.material[index].reflectionColor.x;
             color.y += refColor.y * scene.material[index].reflectionColor.y;
             color.z += refColor.z * scene.material[index].reflectionColor.z;
@@ -271,7 +269,7 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         struct Ray diffuseRay = {0};
         diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
         diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
-        struct Vec3 refDiffuseColor = shade(diffuseRay, depth - 1);
+        struct Vec3 refDiffuseColor = Shade(diffuseRay, depth - 1);
         color.x += refDiffuseColor.x * hitcolor.x;
         color.y += refDiffuseColor.y * hitcolor.y;
         color.z += refDiffuseColor.z * hitcolor.z;
@@ -282,6 +280,31 @@ static inline struct Vec3 shade(struct Ray r, int depth) {
         color.z += scene.material[index].emissionColor.z;
     }
     return color;
+}
+
+static inline struct Vec3 renderPixel(int width, int height, int x, int y, struct Mat3 rot, int samples, int depth) {
+    struct Ray r;
+    r.origin = cameraPos;
+    struct Vec3 color = {0};
+    for (int i = 0; i < samples; i++) {
+        struct Vec3 rv2 = {0};
+        rv2.x = (float)SDL_rand(1000000) / 1000000.0f;
+        rv2.y = (float)SDL_rand(1000000) / 1000000.0f;
+        if (samples == 1) {
+            rv2.x = 0;
+            rv2.y = 0;
+        }
+
+        r.direction.x = ((float)x + rv2.x) / (float)width - 0.5;
+        r.direction.y = ((float)y + rv2.y) / (float)height - 0.5;
+        r.direction.y *= -(float)height/(float)width;
+        r.direction.z = 0.5;
+        r.direction = Vec3Normalize(r.direction);
+        r.direction = Mat3Vec3Mul(rot, r.direction);
+        color = Vec3Add(color, Shade(r, depth));
+    }
+
+    return Vec3Mul(color, 1.0/(float)samples);
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
@@ -308,39 +331,29 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     posDelta = Mat3Vec3Mul(rot, posDelta);
     cameraPos = Vec3Add(cameraPos, posDelta);
 
-    SDL_Rect r = {0, 0, s.width, s.height};
-    SDL_FRect fr = {0, 0, s.width, s.height};
+    int height = s.height;
+    int width = s.width;
+    if (s.renderMode) {
+        height = s.renderHeight;
+        width = s.renderWidth;
+    }
+    SDL_Rect r = {0, 0, width, height};
+    SDL_FRect fr = {0, 0, width, height};
     uint32_t *pixels;
     int pitch;
 
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);
 
     #pragma omp parallel for
-    for (int x = 0; x < s.width; x++) {
-        for (int y = 0; y < s.height; y++) {
-            struct Ray r;
-            r.origin = cameraPos;
-
+    for (int x = 0; x < width; x++) {
+        for (int y = 0; y < height; y++) {
             struct Vec3 color = {0};
-            for (int i = 0; i < s.samples; i++) {
-                struct Vec3 rv2 = {0};
-                rv2.x = (float)SDL_rand(1000000) / 1000000.0f;
-                rv2.y = (float)SDL_rand(1000000) / 1000000.0f;
-                if (s.samples == 1) {
-                    rv2.x = 0;
-                    rv2.y = 0;
-                }
-
-                r.direction.x = ((float)x + rv2.x) / (float)s.width - 0.5;
-                r.direction.y = ((float)y + rv2.y) / (float)s.height - 0.5;
-                r.direction.y *= -(float)s.height/(float)s.width;
-                r.direction.z = 0.5;
-                r.direction = Vec3Normalize(r.direction);
-                r.direction = Mat3Vec3Mul(rot, r.direction);
-                color = Vec3Add(color, shade(r, s.depth));
+            if (s.renderMode) {
+                color = renderPixel(width, height, x, y, rot, s.renderSamples, s.renderDepth);
             }
-
-            color = Vec3Mul(color, 1.0/(float)s.samples);
+            else {
+                color = renderPixel(width, height, x, y, rot, s.samples, s.depth);
+            }
 
             float exposure = 1.5;
             color.x = 1 - exp(-color.x * exposure);
@@ -359,6 +372,19 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
             ((uint32_t*)((void*)pixels + y * pitch))[x] = 0xff | ((uint32_t)(color.x*255)) << 24 | ((uint32_t)(color.y*255)) << 16 | ((uint32_t)(color.z*255)) << 8;
         }
+    }
+
+    if (s.renderMode) {
+        FILE *f = fopen("/tmp/image.ppm", "w");         // Write image to PPM file.
+        fprintf(f, "P3\n%d %d\n%d\n", width, height, 255);
+        for (int i = 0; i < width * height; i++) {
+            int x = i % width;
+            int y = i / width;
+            uint32_t color = ((uint32_t*)((void*)pixels + y * pitch))[x];
+            fprintf(f,"%d %d %d ", (color >> 24) & 0xff, (color >> 16) & 0xff, (color >> 8) & 0xff);
+        }
+        fclose(f);
+        s.renderMode = false;
     }
 
     SDL_UnlockTexture(renderTexture);
