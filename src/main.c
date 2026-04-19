@@ -267,8 +267,19 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         float frenel = FresnelDielectric(cosTheta, scene.material[index].ior);
         // Apply Reflections
         if (frenel > rand) {
+
+            struct Mat3 tbn = Tbn(hit.normal);
+            struct Vec3 tbnIncident = Mat3Vec3Mul(tbn, incidentVector);
+            struct Vec2 u;
+            u.x = (float)SDL_rand(1000000) / 1000000.0f;
+            u.y = (float)SDL_rand(1000000) / 1000000.0f;
+
+            float roughness = scene.material[index].roughness;
+            struct Vec3 tbnNormal = sampleGgxVndf(tbnIncident, Vec2(roughness, roughness), u);
+            struct Vec3 tbnReflected = Reflect(tbnIncident, tbnNormal);
+
             struct Ray reflectionRay = {0};
-            reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
+            reflectionRay.direction = Mat3Vec3Mul(Mat3Transpose(tbn), tbnReflected);
             reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
             struct Vec3 refColor = Shade(reflectionRay, depth - 1);
             //color.x += refColor.x * scene.material[index].reflectionColor.x;

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <SDL3_image/SDL_image.h>
 
+#define PI 3.14159265
+
 struct Vec2 {
     float x;
     float y;
@@ -22,6 +24,7 @@ struct Mat3 {
 struct Material {
     const char *name;
     struct Vec3 color;
+    float roughness;
     struct Vec3 emissionColor;
     float ior;
     SDL_Surface *texture;
@@ -152,6 +155,14 @@ static inline struct Vec3 Vec3Div(struct Vec3 a, struct Vec3 b) {
     };
 }
 
+static inline struct Vec3 Vec3DivScalar(struct Vec3 a, float b) {
+    return (struct Vec3){
+        .x=a.x/b,
+        .y=a.y/b,
+        .z=a.z/b
+    };
+}
+
 static inline struct Vec3 Vec3Cross(struct Vec3 a, struct Vec3 b) {
     return (struct Vec3){
         .x=a.y*b.z-a.z*b.y,
@@ -176,6 +187,10 @@ static inline struct Vec3 Vec3Max(struct Vec3 a, struct Vec3 b) {
     };
 }
 
+static inline struct Vec3 Reflect(struct Vec3 v, struct Vec3 n) {
+    return Vec3Sub(v, Vec3Mul(n, 2*Vec3Dot(n, v)));
+}
+
 static inline struct Vec3 Mat3Vec3Mul(struct Mat3 m, struct Vec3 v) {
     return (struct Vec3){
         .x=Vec3Dot(m.c[0], v),
@@ -189,6 +204,14 @@ static inline struct Mat3 Mat3Mul(struct Mat3 a, struct Mat3 b) {
         .c[0]=Mat3Vec3Mul(a, b.c[0]),
         .c[1]=Mat3Vec3Mul(a, b.c[1]),
         .c[2]=Mat3Vec3Mul(a, b.c[2]),
+    };
+}
+
+static inline struct Mat3 Mat3Transpose(struct Mat3 a) {
+    return (struct Mat3){
+        .c[0]=Vec3(a.c[0].x, a.c[1].x, a.c[2].x),
+        .c[1]=Vec3(a.c[0].y, a.c[1].y, a.c[2].y),
+        .c[2]=Vec3(a.c[0].z, a.c[1].z, a.c[2].z)
     };
 }
 
@@ -413,6 +436,49 @@ static inline float FresnelDielectric(float cosTheta, float ior) {
     float rPerp = (cosTheta - ior * cosThetaT) /
                    (cosTheta + ior * cosThetaT);
     return ((rParl * rParl) + (rPerp * rPerp)) / 2;
+}
+
+// http://jcgt.org/published/0007/04/01/paper.pdf by Eric Heitz
+// Input Ve: view direction
+// Input alpha_x, alpha_y: roughness parameters
+// Input U1, U2: uniform random numbers
+// Output Ne: normal sampled with PDF D_Ve(Ne) = G1(Ve) * max(0, dot(Ve, Ne)) * D(Ne) / Ve.z
+static inline struct Vec3 sampleGgxVndf(struct Vec3 ve, struct Vec2 alpha, struct Vec2 U) {
+    struct Vec3 Vh = Vec3Normalize(Vec3(alpha.x * ve.x, alpha.y * ve.y, ve.z));
+    float lensq = Vec3Length(Vec3(Vh.x, Vh.y, 0));
+
+    struct Vec3 T1 = lensq > 0.0 ? Vec3Mul(Vec3(-Vh.y, Vh.x, 0.0), (1/sqrt(lensq))) : Vec3(1.0, 0.0, 0.0);
+    struct Vec3 T2 = Vec3Cross(Vh, T1);
+
+    float r = sqrt(U.x);
+    float phi = 2.0 * PI * U.y;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+
+    struct Vec3 Nh = Vec3Add(Vec3Add(Vec3Mul(T1, t1), Vec3Mul(T2, t2)), Vec3Mul(Vh, sqrt(fmax(0.0, 1.0 - t1 * t1 - t2 * t2))));
+
+    struct Vec3 Ne = Vec3Normalize(Vec3(alpha.x * Nh.x, alpha.y * Nh.y, fmax(0.0, Nh.z)));
+    return Ne;
+}
+
+static inline struct Mat3 Tbn(struct Vec3 n) {
+    struct Vec3 u;
+    if(fabs(n.z) > 0.0) {
+        u = Vec3DivScalar(Vec3(0.0, -n.z, n.y), Vec3Length(Vec3(n.y, n.z, 0.0)));
+    }
+    else {
+        u = Vec3DivScalar(Vec3(n.y, -n.x, 0.0), Vec3Length(Vec3(n.x, n.y, 0.0)));
+    }
+
+    struct Mat3 TBN;
+
+    TBN.c[0] = u;
+    TBN.c[1] = Vec3Cross(n, u);
+    TBN.c[2] = n;
+
+    return TBN;
 }
 
 #endif //RAYMEOWER_MEOWMATH_H

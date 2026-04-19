@@ -46,6 +46,10 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
         if (begins("Ni", current_line) == 0) {
             sscanf(current_line, "Ni %f", &materials[(*materialCount)-1].ior);
         }
+        if (begins("Ns", current_line) == 0) {
+            sscanf(current_line, "Ns %f", &materials[(*materialCount)-1].roughness);
+            materials[(*materialCount)-1].roughness = 1 - sqrt(materials[(*materialCount)-1].roughness / 1000);
+        }
         if (begins("map_Kd", current_line) == 0) {
             char filename[256];
             sscanf(current_line, "map_Kd %s", filename);
