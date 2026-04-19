@@ -1,0 +1,27 @@
+- Materials
+  - Metallic
+  - Dielectric
+  - Transmissive
+  - Normal map
+- Point light soft shadow
+- Sun soft shadow
+- Smooth shading
+- Tent filtering
+- Tone mapping
+- Gamma
+- BVH improvements
+  - Collapsing levels
+- SAH
+- UI
+  - Scene loading
+  - Point light editor
+  - Sun direction editor
+- Reducing noise effects
+  - Blue noise
+  - filter
+  - temporal accumulation
+  - motion vectors
+- GPU rendering
+  - pls don't let me do this
+  - idk
+  - I don't want
