@@ -330,15 +330,16 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     last_time = t;
     float speed = 3.0f;
 
-    struct Vec3 posDelta = {0};
+    if (!inputStates.menu) {
+        struct Vec3 posDelta = {0};
+        posDelta.x = inputStates.right * speed * dt;
+        posDelta.y = inputStates.up * speed * dt;
+        posDelta.z = inputStates.forward * speed * dt;
+        struct Mat3 rot = RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0);
+        posDelta = Mat3Vec3Mul(rot, posDelta);
+        cameraPos = Vec3Add(cameraPos, posDelta);
+    }
 
-    posDelta.x = inputStates.right * speed * dt;
-    posDelta.y = inputStates.up * speed * dt;
-    posDelta.z = inputStates.forward * speed * dt;
-    struct Mat3 rot = RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0);
-
-    posDelta = Mat3Vec3Mul(rot, posDelta);
-    cameraPos = Vec3Add(cameraPos, posDelta);
 
     int height = s.height;
     int width = s.width;
@@ -362,8 +363,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_UnlockMutex(mutex);
     SDL_UnlockTexture(renderTexture);
     SDL_RenderTexture(renderer, &renderTexture[0], &fr, NULL);
-    nk_sdl_render(ctx, AA);
-    nk_sdl_update_TextInput(ctx);
+    if (inputStates.menu) {
+        nk_sdl_render(ctx, AA);
+        nk_sdl_update_TextInput(ctx);
+    }
 
     SDL_RenderPresent(renderer);
 
