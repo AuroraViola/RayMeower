@@ -260,28 +260,36 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             color = Vec3Add(color, tempColor);
         }
 
+        struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
+        float cosTheta = Vec3Dot(incidentVector, hit.normal);
+        float rand = (float)SDL_rand(1000000) / 1000000.0f;
+
+        float frenel = FresnelDielectric(cosTheta, scene.material[index].ior);
         // Apply Reflections
-        if (scene.material[index].reflectionColor.x != 0 &&
-            scene.material[index].reflectionColor.y != 0 &&
-            scene.material[index].reflectionColor.z != 0) {
+        if (frenel > rand) {
             struct Ray reflectionRay = {0};
-            struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
             reflectionRay.direction = Vec3Sub(incidentVector, Vec3Mul(hit.normal, 2*Vec3Dot(hit.normal, incidentVector)));
             reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
             struct Vec3 refColor = Shade(reflectionRay, depth - 1);
-            color.x += refColor.x * scene.material[index].reflectionColor.x;
-            color.y += refColor.y * scene.material[index].reflectionColor.y;
-            color.z += refColor.z * scene.material[index].reflectionColor.z;
+            //color.x += refColor.x * scene.material[index].reflectionColor.x;
+            //color.y += refColor.y * scene.material[index].reflectionColor.y;
+            //color.z += refColor.z * scene.material[index].reflectionColor.z;
+            color.x += refColor.x;
+            color.y += refColor.y;
+            color.z += refColor.z;
+        }
+        // Apply diffuse global illumination
+        else {
+            struct Ray diffuseRay = {0};
+            diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
+            diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
+            struct Vec3 refDiffuseColor = Shade(diffuseRay, depth - 1);
+            color.x += refDiffuseColor.x * hitcolor.x;
+            color.y += refDiffuseColor.y * hitcolor.y;
+            color.z += refDiffuseColor.z * hitcolor.z;
+
         }
 
-        // Apply diffuse global illumination
-        struct Ray diffuseRay = {0};
-        diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
-        diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
-        struct Vec3 refDiffuseColor = Shade(diffuseRay, depth - 1);
-        color.x += refDiffuseColor.x * hitcolor.x;
-        color.y += refDiffuseColor.y * hitcolor.y;
-        color.z += refDiffuseColor.z * hitcolor.z;
 
         // Apply emission
         color.x += scene.material[index].emissionColor.x;

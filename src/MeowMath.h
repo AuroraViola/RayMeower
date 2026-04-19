@@ -22,8 +22,8 @@ struct Mat3 {
 struct Material {
     const char *name;
     struct Vec3 color;
-    struct Vec3 reflectionColor;
     struct Vec3 emissionColor;
+    float ior;
     SDL_Surface *texture;
 };
 
@@ -394,6 +394,25 @@ static inline struct Vec3 SampleTexture(SDL_Surface *surface, struct Vec2 uv) {
     uint8_t rgb[3];
     SDL_GetRGB(packedPixel, details, NULL, &rgb[0], &rgb[1], &rgb[2]);
     return Vec3(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0);
+}
+
+static inline float FresnelDielectric(float cosTheta, float ior) {
+    if (cosTheta < 0) {
+        cosTheta = -cosTheta;
+        ior = 1/ior;
+    }
+    float sin2ThetaI = 1 - sqrt(cosTheta);
+    float sin2ThetaT = sin2ThetaI / sqrt(ior);
+    if (sin2ThetaT >= 1) {
+        return 1.0f;
+    }
+    float cosThetaT = sqrt(1 - sin2ThetaT);
+
+    float rParl = (ior * cosTheta - cosThetaT) /
+                   (ior * cosTheta + cosThetaT);
+    float rPerp = (cosTheta - ior * cosThetaT) /
+                   (cosTheta + ior * cosThetaT);
+    return ((rParl * rParl) + (rPerp * rPerp)) / 2;
 }
 
 #endif //RAYMEOWER_MEOWMATH_H

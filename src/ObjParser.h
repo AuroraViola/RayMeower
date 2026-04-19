@@ -34,7 +34,6 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
             materials[(*materialCount)-1].name = malloc(256);
             sscanf(current_line, "newmtl %s", materials[(*materialCount)-1].name);
             materials[(*materialCount)-1].color = Vec3(1.0, 1.0, 1.0);
-            materials[(*materialCount)-1].reflectionColor = Vec3(0.0, 0.0, 0.0);
             materials[(*materialCount)-1].emissionColor = Vec3(0.0, 0.0, 0.0);
             materials[(*materialCount)-1].texture = NULL;
         }
@@ -43,6 +42,9 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
         }
         if (begins("Ke", current_line) == 0) {
             sscanf(current_line, "Ke %f %f %f", &materials[(*materialCount)-1].emissionColor.x, &materials[(*materialCount)-1].emissionColor.y, &materials[(*materialCount)-1].emissionColor.z);
+        }
+        if (begins("Ni", current_line) == 0) {
+            sscanf(current_line, "Ni %f", &materials[(*materialCount)-1].ior);
         }
         if (begins("map_Kd", current_line) == 0) {
             char filename[256];
