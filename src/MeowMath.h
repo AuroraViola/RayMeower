@@ -330,7 +330,7 @@ static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triang
     float a2 = TriangleDoubleArea(t2);
     float a3 = TriangleDoubleArea(t3);
 
-    if (a < (a1 + a2 + a3) - 1e-5) {
+    if (a < (a1 + a2 + a3) - 1e-5 * a) {
         return Vec3(-1, -1, -1);
     }
 
