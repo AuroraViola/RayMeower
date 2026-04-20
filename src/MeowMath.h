@@ -26,6 +26,7 @@ struct Material {
     struct Vec3 color;
     float roughness;
     struct Vec3 emissionColor;
+    float emissionIntensity;
     float ior;
     SDL_Surface *texture;
 };
@@ -56,12 +57,15 @@ struct Triangle {
 struct Sun {
     struct Vec3 dir;
     struct Vec3 color;
+    float intensity;
 };
 
 struct PointLight {
     struct Vec3 pos;
     struct Vec3 color;
+    float intensity;
 };
+
 
 struct HitPoint {
     bool hit;
@@ -74,6 +78,21 @@ struct HitPoint {
 struct AABB {
     struct Vec3 min;
     struct Vec3 max;
+};
+
+struct Mesh {
+    struct Triangle *triangles;
+    int triangleCount;
+    struct Material *material;
+    int materialCount;
+};
+
+struct Scene {
+    struct Mesh mesh;
+    struct BVHNode *bvhRoot;
+    struct Sun sun;
+    struct PointLight *lights;
+    int lightsCount;
 };
 
 static inline struct Vec3 Vec3(float x, float y, float z) {

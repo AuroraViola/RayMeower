@@ -1,6 +1,6 @@
 - Materials
   - Metallic
-  - Dielectric
+  - ~~Dielectric~~
   - Transmissive
   - Normal map
 - Point light soft shadow

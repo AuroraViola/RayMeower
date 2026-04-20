@@ -61,6 +61,7 @@
 #include "nuklear.h"
 #define NK_SDL3_RENDERER_IMPLEMENTATION
 #include "nuklear_sdl3_renderer.h"
+#include "MeowMath.h"
 
 struct Settings {
     int samples;
@@ -79,12 +80,21 @@ struct Settings {
         struct Vec3 skyColor;
         struct nk_colorf skyColorNk;
     };
+    int selectedMaterial;
 };
+
+char *materialNames = NULL;
 
 struct nk_context* ctx;
 enum nk_anti_aliasing AA;
 
-void NkUiInit(SDL_Window *window, SDL_Renderer *renderer) {
+void NkUiInit(SDL_Window *window, SDL_Renderer *renderer, struct Scene *scene) {
+    materialNames = calloc(256 * scene->mesh.materialCount, sizeof(char));
+    char *currentPos = materialNames;
+    for (int i = 0; i < scene->mesh.materialCount; i++) {
+        currentPos = stpcpy(currentPos, scene->mesh.material[i].name) + 1;
+    }
+
     float font_scale = 1.0f;
     ctx = nk_sdl_init(window, renderer, nk_sdl_allocator());
     struct nk_font_atlas *atlas;
@@ -113,23 +123,23 @@ void NkUiInit(SDL_Window *window, SDL_Renderer *renderer) {
     nk_input_begin(ctx);
 }
 
-void NkUiDraw(struct Settings *settings) {
+void NkUiDraw(struct Settings *settings, struct Scene *scene) {
     nk_input_end(ctx);
 
-    /* GUI */
-    if (nk_begin(ctx, "Settings", nk_rect(50, 50, 250, 460),
+    /* Rendering settings */
+    if (nk_begin(ctx, "Renderer", nk_rect(16, 16, 250, 380),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
         {
         nk_layout_row_dynamic(ctx, 25, 1);
 
-        nk_label(ctx, "Viewport settings", NK_TEXT_CENTERED);
+        nk_label(ctx, "Viewport", NK_TEXT_CENTERED);
         nk_property_int(ctx, "Resolution X:", 32, &settings->width, 640, 1, 1);
         nk_property_int(ctx, "Resolution Y:", 32, &settings->height, 480, 1, 1);
         nk_property_int(ctx, "Samples:", 1, &settings->samples, 16, 1, 1);
         nk_property_int(ctx, "Depth:", 1, &settings->depth, 4, 1, 1);
 
-        nk_label(ctx, "Render settings", NK_TEXT_CENTERED);
+        nk_label(ctx, "Final render", NK_TEXT_CENTERED);
         if (nk_button_label(ctx, "Render Image")) {
             settings->renderMode = true;
         }
@@ -137,12 +147,17 @@ void NkUiDraw(struct Settings *settings) {
         nk_property_int(ctx, "Resolution Y: ",  64, &settings->renderHeight, 2160, 1, 1);
         nk_property_int(ctx, "Samples: ", 1, &settings->renderSamples, 1024, 1, 1);
         nk_property_int(ctx, "Depth: ", 1, &settings->renderDepth, 8, 1, 1);
+    }
+    nk_end(ctx);
 
-
-        nk_label(ctx, "Scene settings", NK_TEXT_CENTERED);
+    /* Scene settings */
+    if (nk_begin(ctx, "Scene", nk_rect(282, 16, 250, 150),
+        NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
+        NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
+    {
+        nk_layout_row_dynamic(ctx, 25, 2);
         nk_label(ctx, "Sky Color:", NK_TEXT_LEFT);
-        nk_layout_row_dynamic(ctx, 25, 1);
-        if (nk_combo_begin_color(ctx, nk_rgb_cf(settings->skyColorNk), nk_vec2(nk_widget_width(ctx),400))) {
+        if (nk_combo_begin_color(ctx, nk_rgb_cf(settings->skyColorNk), nk_vec2(nk_widget_width(ctx)*2,400))) {
             nk_layout_row_dynamic(ctx, 120, 1);
             settings->skyColorNk = nk_color_picker(ctx, settings->skyColorNk, NK_RGBA);
             nk_layout_row_dynamic(ctx, 25, 1);
@@ -151,6 +166,70 @@ void NkUiDraw(struct Settings *settings) {
             settings->skyColor.z = nk_propertyf(ctx, "#B:", 0, settings->skyColor.z, 1.0f, 0.01f,0.005f);
             nk_combo_end(ctx);
         }
+        nk_label(ctx, "Sun Color", NK_TEXT_LEFT);
+        struct nk_colorf sunColor = {scene->sun.color.x, scene->sun.color.y, scene->sun.color.z, 1.0f};
+        if (nk_combo_begin_color(ctx, nk_rgb_cf(sunColor), nk_vec2(nk_widget_width(ctx)*2,400))) {
+            nk_layout_row_dynamic(ctx, 120, 1);
+            sunColor = nk_color_picker(ctx, sunColor, NK_RGBA);
+            nk_layout_row_dynamic(ctx, 25, 1);
+            sunColor.r = nk_propertyf(ctx, "#R:", 0, sunColor.r, 1.0f, 0.01f,0.005f);
+            sunColor.g = nk_propertyf(ctx, "#G:", 0, sunColor.g, 1.0f, 0.01f,0.005f);
+            sunColor.b = nk_propertyf(ctx, "#B:", 0, sunColor.b, 1.0f, 0.01f,0.005f);
+            nk_combo_end(ctx);
+        }
+        scene->sun.color.x = sunColor.r;
+        scene->sun.color.y = sunColor.g;
+        scene->sun.color.z = sunColor.b;
+        nk_layout_row_dynamic(ctx, 25, 1);
+        scene->sun.intensity = nk_propertyf(ctx, "Sun Intensity", 0, scene->sun.intensity, 100.0f, 0.01f,0.05f);
+    }
+    nk_end(ctx);
+
+    /* Materials */
+    if (nk_begin(ctx, "Materials", nk_rect(548, 16, 250, 250),
+        NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
+        NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
+    {
+        nk_layout_row_dynamic(ctx, 25, 2);
+
+        nk_label(ctx, "Material:", NK_TEXT_LEFT);
+        settings->selectedMaterial = nk_combo_string(ctx, materialNames, settings->selectedMaterial, scene->mesh.materialCount, 25, (struct nk_vec2){nk_widget_width(ctx), 400});
+
+        nk_label(ctx, "Material Color", NK_TEXT_LEFT);
+        struct nk_colorf materialColor = {scene->mesh.material[settings->selectedMaterial].color.x, scene->mesh.material[settings->selectedMaterial].color.y, scene->mesh.material[settings->selectedMaterial].color.z, 1.0f};
+        if (nk_combo_begin_color(ctx, nk_rgb_cf(materialColor), nk_vec2(nk_widget_width(ctx)*2,400))) {
+            nk_layout_row_dynamic(ctx, 120, 1);
+            materialColor = nk_color_picker(ctx, materialColor, NK_RGBA);
+            nk_layout_row_dynamic(ctx, 25, 1);
+            materialColor.r = nk_propertyf(ctx, "#R:", 0, materialColor.r, 1.0f, 0.01f,0.005f);
+            materialColor.g = nk_propertyf(ctx, "#G:", 0, materialColor.g, 1.0f, 0.01f,0.005f);
+            materialColor.b = nk_propertyf(ctx, "#B:", 0, materialColor.b, 1.0f, 0.01f,0.005f);
+            nk_combo_end(ctx);
+        }
+        scene->mesh.material[settings->selectedMaterial].color.x = materialColor.r;
+        scene->mesh.material[settings->selectedMaterial].color.y = materialColor.g;
+        scene->mesh.material[settings->selectedMaterial].color.z = materialColor.b;
+
+        nk_layout_row_dynamic(ctx, 25, 1);
+        scene->mesh.material[settings->selectedMaterial].roughness = nk_propertyf(ctx, "Roughness", 0, scene->mesh.material[settings->selectedMaterial].roughness, 1.0f, 0.01f,0.005f);
+        scene->mesh.material[settings->selectedMaterial].ior = nk_propertyf(ctx, "IOR", 1.0f, scene->mesh.material[settings->selectedMaterial].ior, 4.0f, 0.01f,0.005f);
+        nk_layout_row_dynamic(ctx, 25, 2);
+        nk_label(ctx, "Emission Color", NK_TEXT_LEFT);
+        struct nk_colorf emissionColor = {scene->mesh.material[settings->selectedMaterial].emissionColor.x, scene->mesh.material[settings->selectedMaterial].emissionColor.y, scene->mesh.material[settings->selectedMaterial].emissionColor.z, 1.0f};
+        if (nk_combo_begin_color(ctx, nk_rgb_cf(emissionColor), nk_vec2(nk_widget_width(ctx)*2,400))) {
+            nk_layout_row_dynamic(ctx, 120, 1);
+            emissionColor = nk_color_picker(ctx, emissionColor, NK_RGBA);
+            nk_layout_row_dynamic(ctx, 25, 1);
+            emissionColor.r = nk_propertyf(ctx, "#R:", 0, emissionColor.r, 1.0f, 0.01f,0.005f);
+            emissionColor.g = nk_propertyf(ctx, "#G:", 0, emissionColor.g, 1.0f, 0.01f,0.005f);
+            emissionColor.b = nk_propertyf(ctx, "#B:", 0, emissionColor.b, 1.0f, 0.01f,0.005f);
+            nk_combo_end(ctx);
+        }
+        scene->mesh.material[settings->selectedMaterial].emissionColor.x = emissionColor.r;
+        scene->mesh.material[settings->selectedMaterial].emissionColor.y = emissionColor.g;
+        scene->mesh.material[settings->selectedMaterial].emissionColor.z = emissionColor.b;
+        nk_layout_row_dynamic(ctx, 25, 1);
+        scene->mesh.material[settings->selectedMaterial].emissionIntensity = nk_propertyf(ctx, "Emission intensity", 0.0f, scene->mesh.material[settings->selectedMaterial].emissionIntensity, 100.0f, 0.01f,0.01f);
     }
     nk_end(ctx);
 }

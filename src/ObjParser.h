@@ -10,12 +10,6 @@
 
 #define begins(a, b) strncmp(a, b, strlen(a))
 
-struct Mesh {
-    struct Triangle *triangles;
-    int triangleCount;
-    struct Material *material;
-    int materialCount;
-};
 
 static inline void ResolvePath(const char *path, const char *filename, char *resoved) {
     char cur[256];
@@ -42,6 +36,10 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
         }
         if (begins("Ke", current_line) == 0) {
             sscanf(current_line, "Ke %f %f %f", &materials[(*materialCount)-1].emissionColor.x, &materials[(*materialCount)-1].emissionColor.y, &materials[(*materialCount)-1].emissionColor.z);
+            materials[(*materialCount)-1].emissionIntensity = Vec3Length(materials[(*materialCount)-1].emissionColor);
+            if (materials[(*materialCount)-1].emissionIntensity > 0.0) {
+                materials[(*materialCount)-1].emissionColor = Vec3DivScalar(materials[(*materialCount)-1].emissionColor, materials[(*materialCount)-1].emissionIntensity);
+            }
         }
         if (begins("Ni", current_line) == 0) {
             sscanf(current_line, "Ni %f", &materials[(*materialCount)-1].ior);
