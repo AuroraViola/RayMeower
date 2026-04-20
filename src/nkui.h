@@ -187,6 +187,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         scene->sun.intensity = nk_propertyf(ctx, "Sun Intensity", 0, scene->sun.intensity, 100.0f, 0.01f,0.05f);
         settings->sunElevation = nk_propertyf(ctx, "Sun Elevation", -INFINITY, settings->sunElevation, INFINITY, 0.1f,0.2f);
         settings->sunRotation = nk_propertyf(ctx, "Sun Rotation", -INFINITY, settings->sunRotation, INFINITY, 0.1f,0.2f);
+        scene->sun.angle = nk_propertyf(ctx, "Sun Angle", 0, scene->sun.angle, 90.0f, 0.001f,0.001f);
 
         struct Mat3 sunRotationMat = RotMat((settings->sunRotation * PI / 180), 0, (settings->sunElevation * PI / 180));
         scene->sun.dir = Mat3Vec3Mul(sunRotationMat, Vec3(-1, 0, 0));

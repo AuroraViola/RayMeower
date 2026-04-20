@@ -58,6 +58,7 @@ struct Sun {
     struct Vec3 dir;
     struct Vec3 color;
     float intensity;
+    float angle;
 };
 
 struct PointLight {
@@ -498,6 +499,15 @@ static inline struct Mat3 Tbn(struct Vec3 n) {
     TBN.c[2] = n;
 
     return TBN;
+}
+
+static inline struct Vec2 UniformRandomCirclePoint(float radius, struct Vec2 u) {
+    float alpha = u.x * 2 * PI;
+    radius = sqrt(u.y) * radius;
+    return (struct Vec2){
+        .x = radius * sin(alpha),
+        .y = radius * cos(alpha)
+    };
 }
 
 #endif //RAYMEOWER_MEOWMATH_H

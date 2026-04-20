@@ -4,7 +4,7 @@
   - Transmissive
   - Normal map
 - Point light soft shadow
-- Sun soft shadow
+- ~~Sun soft shadow~~
 - Smooth shading
 - Tent filtering
 - Tone mapping
@@ -21,6 +21,7 @@
   - filter
   - temporal accumulation
   - motion vectors
+- Depth of field
 - GPU rendering
   - pls don't let me do this
   - idk

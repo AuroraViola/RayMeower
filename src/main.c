@@ -64,6 +64,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     scene.sun = (struct Sun){.dir={0, -1, 0}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};
     scene.sun.dir = Vec3Normalize(scene.sun.dir);
+    scene.sun.angle = 0.275;
     scene.lightsCount = 0;
 
     NkUiInit(window, renderer, &scene);
@@ -208,6 +209,12 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         // Apply sun shadows
         struct Ray shadowRay = {0};
         shadowRay.direction = Vec3Mul(scene.sun.dir, -1);
+        struct Vec2 u;
+        u.x = (float)SDL_rand(1000000) / 1000000.0f;
+        u.y = (float)SDL_rand(1000000) / 1000000.0f;
+        struct Vec2 randomPoint = UniformRandomCirclePoint(tanf(scene.sun.angle/180*PI), u);
+        struct Mat3 tbn = Mat3Transpose(Tbn(shadowRay.direction));
+        shadowRay.direction = Mat3Vec3Mul(tbn, Vec3Normalize(Vec3(randomPoint.x, randomPoint.y, 1)));
         shadowRay.origin = Vec3Add(hit.point, Vec3Mul(shadowRay.direction, 0.001));
         struct HitPoint shadowHit = {0};
         int dummy = 0;
@@ -287,6 +294,11 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         color.x += scene.mesh.material[index].emissionColor.x * scene.mesh.material[index].emissionIntensity;
         color.y += scene.mesh.material[index].emissionColor.y * scene.mesh.material[index].emissionIntensity;
         color.z += scene.mesh.material[index].emissionColor.z * scene.mesh.material[index].emissionIntensity;
+    }
+    else {
+        if (-Vec3Dot(r.direction, scene.sun.dir) > cosf(scene.sun.angle / 180 * PI)) {
+            color = Vec3Mul(scene.sun.color, scene.sun.intensity);
+        }
     }
     return color;
 }
