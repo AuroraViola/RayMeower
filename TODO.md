@@ -15,7 +15,7 @@
 - UI
   - Scene loading
   - Point light editor
-  - Sun direction editor
+  - ~~Sun direction editor~~
 - Reducing noise effects
   - Blue noise
   - filter

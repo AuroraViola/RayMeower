@@ -74,6 +74,9 @@ struct Settings {
     int renderHeight;
     int renderWidth;
 
+    float sunElevation;
+    float sunRotation;
+
     bool renderMode;
 
     union {
@@ -151,7 +154,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
     nk_end(ctx);
 
     /* Scene settings */
-    if (nk_begin(ctx, "Scene", nk_rect(282, 16, 250, 150),
+    if (nk_begin(ctx, "Scene", nk_rect(282, 16, 250, 250),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {
@@ -182,6 +185,11 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         scene->sun.color.z = sunColor.b;
         nk_layout_row_dynamic(ctx, 25, 1);
         scene->sun.intensity = nk_propertyf(ctx, "Sun Intensity", 0, scene->sun.intensity, 100.0f, 0.01f,0.05f);
+        settings->sunElevation = nk_propertyf(ctx, "Sun Elevation", -INFINITY, settings->sunElevation, INFINITY, 0.1f,0.2f);
+        settings->sunRotation = nk_propertyf(ctx, "Sun Rotation", -INFINITY, settings->sunRotation, INFINITY, 0.1f,0.2f);
+
+        struct Mat3 sunRotationMat = RotMat((settings->sunRotation * PI / 180), 0, (settings->sunElevation * PI / 180));
+        scene->sun.dir = Mat3Vec3Mul(sunRotationMat, Vec3(-1, 0, 0));
     }
     nk_end(ctx);
 

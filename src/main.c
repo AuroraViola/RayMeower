@@ -62,7 +62,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     scene.mesh = ImportObj("../Objs/Camera.obj");
     scene.bvhRoot = BuildBVH(scene.mesh.triangles, scene.mesh.triangleCount);
 
-    scene.sun = (struct Sun){.dir={-1, -1, -0.5}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};
+    scene.sun = (struct Sun){.dir={0, -1, 0}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};
     scene.sun.dir = Vec3Normalize(scene.sun.dir);
     scene.lightsCount = 0;
 
@@ -80,6 +80,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     s.renderHeight = 1080;
     s.renderMode = false;
     s.selectedMaterial = 0;
+    s.sunElevation = 30;
+    s.sunRotation = 40;
 
     mutex = SDL_CreateMutex();
 
