@@ -443,9 +443,9 @@ static inline float FresnelDielectric(float cosTheta, float ior) {
     return ((rParl * rParl) + (rPerp * rPerp)) / 2;
 }
 
-static inline struct Vec3 Refract(struct Ray ray, struct Vec3 normal, float ior) {
-    ray.direction = Vec3Mul(ray.direction, -1);
-    float cosTheta = -Vec3Dot(ray.direction, normal);
+static inline struct Vec3 Refract(struct Vec3 direction, struct Vec3 normal, float ior) {
+    direction = Vec3Mul(direction, -1);
+    float cosTheta = -Vec3Dot(direction, normal);
     normal = Vec3Mul(normal, -1);
     if (cosTheta < 0) {
         normal = Vec3Mul(normal, -1);
@@ -455,11 +455,11 @@ static inline struct Vec3 Refract(struct Ray ray, struct Vec3 normal, float ior)
     float sin2ThetaI = 1 - cosTheta * cosTheta;
     float sin2ThetaT = sin2ThetaI / (ior * ior);
     if (sin2ThetaT >= 1) {
-        printf("miao\n");
-        return Vec3(0, 0, 0);
+        // Total internal reflection handled in Fresnel
+        sin2ThetaT = 1;
     }
     float cosThetaT = sqrt(1 - sin2ThetaT);
-    return Vec3Normalize(Vec3Add(Vec3DivScalar(ray.direction, -ior), Vec3Mul(normal, (cosTheta / ior - cosThetaT))));
+    return Vec3Normalize(Vec3Add(Vec3DivScalar(direction, -ior), Vec3Mul(normal, (cosTheta / ior - cosThetaT))));
 }
 
 static inline float Lerp(float a, float b, float fact) {

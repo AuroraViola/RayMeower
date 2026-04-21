@@ -296,8 +296,18 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         }
         // Transmissive
         else {
+            struct Mat3 tbn = Tbn(cosTheta < 0 ? Vec3Mul(hit.normal, -1) : hit.normal);
+            struct Vec3 tbnIncident = Mat3Vec3Mul(tbn, incidentVector);
+            struct Vec2 u;
+            u.x = (float)SDL_rand(1000000) / 1000000.0f;
+            u.y = (float)SDL_rand(1000000) / 1000000.0f;
+
+            float roughness = scene.mesh.material[index].roughness;
+            struct Vec3 tbnNormal = sampleGgxVndf(tbnIncident, Vec2(roughness, roughness), u);
+            struct Vec3 tbnRefracted = Refract(tbnIncident, cosTheta < 0 ? Vec3Mul(tbnNormal, -1) : tbnNormal, scene.mesh.material[index].ior);
+
             struct Ray transRay;
-            transRay.direction = Refract(r, hit.normal, scene.mesh.material[index].ior);
+            transRay.direction = Mat3Vec3Mul(Mat3Transpose(tbn), tbnRefracted);
             transRay.origin = Vec3Add(hit.point, Vec3Mul(transRay.direction, 0.001));
             struct Vec3 transColor = Shade(transRay, depth - 1);
             color.x += transColor.x * hitcolor.x;
