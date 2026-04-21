@@ -412,6 +412,10 @@ static int SDLCALL RenderThread(void *ptr) {
 
         SDL_UnlockMutex(mutex);
 
+        if (renderMode) {
+            memset(&pixel[currentTexture], 0, sizeof(pixel[0]));
+        }
+
         #pragma omp parallel for schedule(dynamic, 16)
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
