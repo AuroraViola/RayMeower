@@ -24,6 +24,7 @@ struct Mat3 {
 struct Material {
     const char *name;
     struct Vec3 color;
+    float metallic;
     float roughness;
     struct Vec3 emissionColor;
     float emissionIntensity;
@@ -456,6 +457,10 @@ static inline float FresnelDielectric(float cosTheta, float ior) {
     float rPerp = (cosTheta - ior * cosThetaT) /
                    (cosTheta + ior * cosThetaT);
     return ((rParl * rParl) + (rPerp * rPerp)) / 2;
+}
+
+static inline float Lerp(float a, float b, float fact) {
+    return a + fact * (b - a);
 }
 
 // http://jcgt.org/published/0007/04/01/paper.pdf by Eric Heitz

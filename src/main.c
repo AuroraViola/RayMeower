@@ -188,6 +188,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
     struct Triangle *triangleID = NULL;
     hit = BVHHit(r, scene.bvhRoot, 0, &index, &triangleID);
     if (hit.hit) {
+        color = Vec3(0, 0, 0);
         struct Vec3 hitcolor = scene.mesh.material[index].color;
         if (scene.mesh.material[index].texture != NULL) {
             struct Vec3 uvs[3];
@@ -197,69 +198,15 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             struct Vec2 uv = Vec3ToVec2(InterpolateAttribute(hit, uvs));
             hitcolor = SampleTexture(scene.mesh.material[index].texture, uv);
         }
-        // Apply sun contribution
-        color = hitcolor;
-        float d = Vec3Dot(scene.sun.dir, hit.normal) * scene.sun.intensity;
-        if (d < 0)
-            d = 0;
-        color.x *= scene.sun.color.x * d;
-        color.y *= scene.sun.color.y * d;
-        color.z *= scene.sun.color.z * d;
 
-        // Apply sun shadows
-        struct Ray shadowRay = {0};
-        shadowRay.direction = Vec3Mul(scene.sun.dir, -1);
-        struct Vec2 u;
-        u.x = (float)SDL_rand(1000000) / 1000000.0f;
-        u.y = (float)SDL_rand(1000000) / 1000000.0f;
-        struct Vec2 randomPoint = UniformRandomCirclePoint(tanf(scene.sun.angle/180*PI), u);
-        struct Mat3 tbn = Mat3Transpose(Tbn(shadowRay.direction));
-        shadowRay.direction = Mat3Vec3Mul(tbn, Vec3Normalize(Vec3(randomPoint.x, randomPoint.y, 1)));
-        shadowRay.origin = Vec3Add(hit.point, Vec3Mul(shadowRay.direction, 0.001));
-        struct HitPoint shadowHit = {0};
-        int dummy = 0;
-        struct Triangle *shadowTriangleID = NULL;
-        shadowHit = BVHHit(shadowRay, scene.bvhRoot, 0, &dummy, &shadowTriangleID);
-        if (shadowHit.hit && shadowTriangleID != triangleID) {
-            color.x = 0;
-            color.y = 0;
-            color.z = 0;
-        }
-
-        // Apply lights contribution
-        for (int i = 0; i < scene.lightsCount; i++) {
-            struct Vec3 tempColor = hitcolor;
-            struct Vec3 incidentVector = Vec3Sub(hit.point, scene.lights[i].pos);
-            float distance = Vec3Length(incidentVector);
-            incidentVector = Vec3Normalize(incidentVector);
-
-            // Apply light shadows
-            struct Ray shadowRay = {0};
-            shadowRay.origin = scene.lights[i].pos;
-            shadowRay.direction = incidentVector;
-            struct HitPoint shadowHit = {0};
-            struct Triangle *shadowTriangleID = NULL;
-            shadowHit = BVHHit(shadowRay, scene.bvhRoot, 0, &dummy, &shadowTriangleID);
-            if (shadowHit.hit && shadowTriangleID != triangleID) {
-                continue;
-            }
-
-            float d = (Vec3Dot(incidentVector, hit.normal) / (distance * distance)) * scene.lights[i].intensity;
-            if (d < 0)
-                d = 0;
-            tempColor.x *= scene.lights[i].color.x * d;
-            tempColor.y *= scene.lights[i].color.y * d;
-            tempColor.z *= scene.lights[i].color.z * d;
-            color = Vec3Add(color, tempColor);
-        }
 
         // Apply Reflections
         struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
         float cosTheta = Vec3Dot(incidentVector, hit.normal);
         float rand = (float)SDL_rand(1000000) / 1000000.0f;
 
-        float frenel = FresnelDielectric(cosTheta, scene.mesh.material[index].ior);
-        if (frenel > rand) {
+        float fresnel = Lerp(scene.mesh.material[index].metallic, 1, FresnelDielectric(cosTheta, scene.mesh.material[index].ior));
+        if (fresnel > rand) {
             struct Mat3 tbn = Tbn(hit.normal);
             struct Vec3 tbnIncident = Mat3Vec3Mul(tbn, incidentVector);
             struct Vec2 u;
@@ -274,12 +221,68 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             reflectionRay.direction = Mat3Vec3Mul(Mat3Transpose(tbn), tbnReflected);
             reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
             struct Vec3 refColor = Shade(reflectionRay, depth - 1);
-            color.x += refColor.x;
-            color.y += refColor.y;
-            color.z += refColor.z;
+            color.x += refColor.x * Lerp(1, hitcolor.x, scene.mesh.material[index].metallic);
+            color.y += refColor.y * Lerp(1, hitcolor.y, scene.mesh.material[index].metallic);
+            color.z += refColor.z * Lerp(1, hitcolor.z, scene.mesh.material[index].metallic);
         }
         // Apply diffuse global illumination
         else {
+            // Apply sun contribution
+            color = hitcolor;
+            float d = Vec3Dot(scene.sun.dir, hit.normal) * scene.sun.intensity;
+            if (d < 0)
+                d = 0;
+            color.x *= scene.sun.color.x * d;
+            color.y *= scene.sun.color.y * d;
+            color.z *= scene.sun.color.z * d;
+
+            // Apply sun shadows
+            struct Ray shadowRay = {0};
+            shadowRay.direction = Vec3Mul(scene.sun.dir, -1);
+            struct Vec2 u;
+            u.x = (float)SDL_rand(1000000) / 1000000.0f;
+            u.y = (float)SDL_rand(1000000) / 1000000.0f;
+            struct Vec2 randomPoint = UniformRandomCirclePoint(tanf(scene.sun.angle/180*PI), u);
+            struct Mat3 tbn = Mat3Transpose(Tbn(shadowRay.direction));
+            shadowRay.direction = Mat3Vec3Mul(tbn, Vec3Normalize(Vec3(randomPoint.x, randomPoint.y, 1)));
+            shadowRay.origin = Vec3Add(hit.point, Vec3Mul(shadowRay.direction, 0.001));
+            struct HitPoint shadowHit = {0};
+            int dummy = 0;
+            struct Triangle *shadowTriangleID = NULL;
+            shadowHit = BVHHit(shadowRay, scene.bvhRoot, 0, &dummy, &shadowTriangleID);
+            if (shadowHit.hit && shadowTriangleID != triangleID) {
+                color.x = 0;
+                color.y = 0;
+                color.z = 0;
+            }
+
+            // Apply lights contribution
+            for (int i = 0; i < scene.lightsCount; i++) {
+                struct Vec3 tempColor = hitcolor;
+                struct Vec3 incidentVector = Vec3Sub(hit.point, scene.lights[i].pos);
+                float distance = Vec3Length(incidentVector);
+                incidentVector = Vec3Normalize(incidentVector);
+
+                // Apply light shadows
+                struct Ray shadowRay = {0};
+                shadowRay.origin = scene.lights[i].pos;
+                shadowRay.direction = incidentVector;
+                struct HitPoint shadowHit = {0};
+                struct Triangle *shadowTriangleID = NULL;
+                shadowHit = BVHHit(shadowRay, scene.bvhRoot, 0, &dummy, &shadowTriangleID);
+                if (shadowHit.hit && shadowTriangleID != triangleID) {
+                    continue;
+                }
+
+                float d = (Vec3Dot(incidentVector, hit.normal) / (distance * distance)) * scene.lights[i].intensity;
+                if (d < 0)
+                    d = 0;
+                tempColor.x *= scene.lights[i].color.x * d;
+                tempColor.y *= scene.lights[i].color.y * d;
+                tempColor.z *= scene.lights[i].color.z * d;
+                color = Vec3Add(color, tempColor);
+            }
+
             struct Ray diffuseRay = {0};
             diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
             diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
@@ -287,7 +290,6 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             color.x += refDiffuseColor.x * hitcolor.x;
             color.y += refDiffuseColor.y * hitcolor.y;
             color.z += refDiffuseColor.z * hitcolor.z;
-
         }
 
         // Apply emission
@@ -410,7 +412,7 @@ static int SDLCALL RenderThread(void *ptr) {
 
         SDL_UnlockMutex(mutex);
 
-        #pragma omp parallel for
+        #pragma omp parallel for schedule(dynamic, 16)
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 struct Vec3 color = {0};

@@ -1,5 +1,5 @@
 - Materials
-  - Metallic
+  - ~~Metallic~~
   - ~~Dielectric~~
   - Transmissive
   - Normal map

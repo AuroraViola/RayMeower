@@ -139,8 +139,8 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         nk_label(ctx, "Viewport", NK_TEXT_CENTERED);
         nk_property_int(ctx, "Resolution X:", 32, &settings->width, 640, 1, 1);
         nk_property_int(ctx, "Resolution Y:", 32, &settings->height, 480, 1, 1);
-        nk_property_int(ctx, "Samples:", 1, &settings->samples, 16, 1, 1);
-        nk_property_int(ctx, "Depth:", 1, &settings->depth, 4, 1, 1);
+        nk_property_int(ctx, "Samples:", 1, &settings->samples, 64, 1, 1);
+        nk_property_int(ctx, "Depth:", 1, &settings->depth, 8, 1, 1);
 
         nk_label(ctx, "Final render", NK_TEXT_CENTERED);
         if (nk_button_label(ctx, "Render Image")) {
@@ -149,7 +149,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         nk_property_int(ctx, "Resolution X: ", 64, &settings->renderWidth, 3840, 1, 1);
         nk_property_int(ctx, "Resolution Y: ",  64, &settings->renderHeight, 2160, 1, 1);
         nk_property_int(ctx, "Samples: ", 1, &settings->renderSamples, 1024, 1, 1);
-        nk_property_int(ctx, "Depth: ", 1, &settings->renderDepth, 8, 1, 1);
+        nk_property_int(ctx, "Depth: ", 1, &settings->renderDepth, 64, 1, 1);
     }
     nk_end(ctx);
 
@@ -221,6 +221,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
 
         nk_layout_row_dynamic(ctx, 25, 1);
         scene->mesh.material[settings->selectedMaterial].roughness = nk_propertyf(ctx, "Roughness", 0, scene->mesh.material[settings->selectedMaterial].roughness, 1.0f, 0.01f,0.005f);
+        scene->mesh.material[settings->selectedMaterial].metallic = nk_propertyf(ctx, "Metallic", 0, scene->mesh.material[settings->selectedMaterial].metallic, 1.0f, 0.01f,0.005f);
         scene->mesh.material[settings->selectedMaterial].ior = nk_propertyf(ctx, "IOR", 1.0f, scene->mesh.material[settings->selectedMaterial].ior, 4.0f, 0.01f,0.005f);
         nk_layout_row_dynamic(ctx, 25, 2);
         nk_label(ctx, "Emission Color", NK_TEXT_LEFT);
