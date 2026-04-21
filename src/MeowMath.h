@@ -307,7 +307,7 @@ static inline struct HitPoint IntersectionTriangleFast(struct Ray ray, struct Tr
 
     // Backface culling, assuming CCW-wound triangles.
     struct Vec3 normal = Vec3Cross(edge1, edge2); // No need to normalize
-    if (Vec3Dot(normal, ray.direction) > 0)
+    //if (Vec3Dot(normal, ray.direction) > 0)
         normal = Vec3Mul(normal, -1);
 
     struct Vec3 ray_cross_e2 = Vec3Cross(ray.direction, edge2);
@@ -429,8 +429,8 @@ static inline float FresnelDielectric(float cosTheta, float ior) {
         cosTheta = -cosTheta;
         ior = 1/ior;
     }
-    float sin2ThetaI = 1 - sqrt(cosTheta);
-    float sin2ThetaT = sin2ThetaI / sqrt(ior);
+    float sin2ThetaI = 1 - cosTheta * cosTheta;
+    float sin2ThetaT = sin2ThetaI / (ior * ior);
     if (sin2ThetaT >= 1) {
         return 1.0f;
     }
@@ -441,6 +441,25 @@ static inline float FresnelDielectric(float cosTheta, float ior) {
     float rPerp = (cosTheta - ior * cosThetaT) /
                    (cosTheta + ior * cosThetaT);
     return ((rParl * rParl) + (rPerp * rPerp)) / 2;
+}
+
+static inline struct Vec3 Refract(struct Ray ray, struct Vec3 normal, float ior) {
+    ray.direction = Vec3Mul(ray.direction, -1);
+    float cosTheta = -Vec3Dot(ray.direction, normal);
+    normal = Vec3Mul(normal, -1);
+    if (cosTheta < 0) {
+        normal = Vec3Mul(normal, -1);
+        cosTheta = -cosTheta;
+        ior = 1/ior;
+    }
+    float sin2ThetaI = 1 - cosTheta * cosTheta;
+    float sin2ThetaT = sin2ThetaI / (ior * ior);
+    if (sin2ThetaT >= 1) {
+        printf("miao\n");
+        return Vec3(0, 0, 0);
+    }
+    float cosThetaT = sqrt(1 - sin2ThetaT);
+    return Vec3Normalize(Vec3Add(Vec3DivScalar(ray.direction, -ior), Vec3Mul(normal, (cosTheta / ior - cosThetaT))));
 }
 
 static inline float Lerp(float a, float b, float fact) {

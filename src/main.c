@@ -201,13 +201,16 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
 
 
         // Apply Reflections
-        struct Vec3 incidentVector = Vec3Normalize(Vec3Sub(hit.point, r.origin));
+        struct Vec3 incidentVector = r.direction;
         float cosTheta = Vec3Dot(incidentVector, hit.normal);
         float rand = (float)SDL_rand(1000000) / 1000000.0f;
+        float randTrans = (float)SDL_rand(1000000) / 1000000.0f;
 
         float fresnel = Lerp(scene.mesh.material[index].metallic, 1, FresnelDielectric(cosTheta, scene.mesh.material[index].ior));
+        //color = Vec3(fresnel, fresnel, fresnel);
+        //return color;
         if (fresnel > rand) {
-            struct Mat3 tbn = Tbn(hit.normal);
+            struct Mat3 tbn = Tbn(cosTheta < 0 ? Vec3Mul(hit.normal, -1) : hit.normal);
             struct Vec3 tbnIncident = Mat3Vec3Mul(tbn, incidentVector);
             struct Vec2 u;
             u.x = (float)SDL_rand(1000000) / 1000000.0f;
@@ -226,7 +229,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             color.z += refColor.z * Lerp(1, hitcolor.z, scene.mesh.material[index].metallic);
         }
         // Apply diffuse global illumination
-        else {
+        else if (randTrans > scene.mesh.material[index].transmissive) {
             // Apply sun contribution
             color = hitcolor;
             float d = Vec3Dot(scene.sun.dir, hit.normal) * scene.sun.intensity;
@@ -290,6 +293,16 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             color.x += refDiffuseColor.x * hitcolor.x;
             color.y += refDiffuseColor.y * hitcolor.y;
             color.z += refDiffuseColor.z * hitcolor.z;
+        }
+        // Transmissive
+        else {
+            struct Ray transRay;
+            transRay.direction = Refract(r, hit.normal, scene.mesh.material[index].ior);
+            transRay.origin = Vec3Add(hit.point, Vec3Mul(transRay.direction, 0.001));
+            struct Vec3 transColor = Shade(transRay, depth - 1);
+            color.x += transColor.x * hitcolor.x;
+            color.y += transColor.y * hitcolor.y;
+            color.z += transColor.z * hitcolor.z;
         }
 
         // Apply emission
