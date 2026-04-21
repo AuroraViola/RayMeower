@@ -9,6 +9,7 @@
 // Avoid funcion call
 #define fmin(a,b) (((a) < (b)) ? (a) : (b))
 #define fmax(a,b) (((a) > (b)) ? (a) : (b))
+#define fabs(a) fmax(a, -a)
 
 struct Vec2 {
     float x;
@@ -47,11 +48,6 @@ struct Sphere {
 struct Ray {
     struct Vec3 origin;
     struct Vec3 direction;
-};
-
-struct Plane {
-    struct Vec3 origin;
-    struct Vec3 normal;
 };
 
 struct Triangle {
@@ -300,71 +296,52 @@ static inline struct Vec3 cosWeightedRandomHemisphereDirection(struct Vec3 n) {
     return Vec3Normalize(rr);
 }
 
-static inline struct HitPoint IntersectionPlane(struct Ray ray, struct Plane plane) {
-    struct HitPoint res = {0};
-    float denom = Vec3Dot(ray.direction, plane.normal);
-    if (denom < 1e-3) {
-        return res;
-    }
-    float nom = Vec3Dot(Vec3Sub(plane.origin, ray.origin), plane.normal);
-    res.distance = nom/denom;
-    if (res.distance >= 0) {
-        res.hit = true;
-    }
-    res.normal = plane.normal;
-    res.point = Vec3Add(ray.origin, Vec3Mul(ray.direction, res.distance));
-    return res;
-}
+static inline struct HitPoint IntersectionTriangleFast(struct Ray ray, struct Triangle triangle) {
+    struct HitPoint hit;
+    hit.hit = false;
+    hit.barycentric = Vec3(0, 1, 0);
+    const float epsilon = 1e-5;
 
-static inline float TriangleDoubleArea(struct Triangle t) {
-    struct Vec3 v1 = Vec3Sub(t.vertices.c[1], t.vertices.c[0]);
-    struct Vec3 v2 = Vec3Sub(t.vertices.c[2], t.vertices.c[0]);
-    return Vec3Length(Vec3Cross(v1, v2));
-}
+    struct Vec3 edge1 = Vec3Sub(triangle.vertices.c[1], triangle.vertices.c[0]);
+    struct Vec3 edge2 = Vec3Sub(triangle.vertices.c[2], triangle.vertices.c[0]);
 
-static inline struct Vec3 TriangleNormal(struct Triangle t, float *a) {
-    struct Vec3 v1 = Vec3Sub(t.vertices.c[1], t.vertices.c[0]);
-    struct Vec3 v2 = Vec3Sub(t.vertices.c[2], t.vertices.c[0]);
-    struct Vec3 c = Vec3Cross(v1, v2);
-    *a = Vec3Length(c);
-    return Vec3DivScalar(c, *a);
-}
+    // Backface culling, assuming CCW-wound triangles.
+    struct Vec3 normal = Vec3Cross(edge1, edge2); // No need to normalize
+    if (Vec3Dot(normal, ray.direction) > 0)
+        normal = Vec3Mul(normal, -1);
 
-static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triangle t, float a) {
-    struct Triangle t1 = {.vertices = {t.vertices.c[1], t.vertices.c[2], p}};
-    struct Triangle t2 = {.vertices = {t.vertices.c[0], t.vertices.c[2], p}};
-    struct Triangle t3 = {.vertices = {t.vertices.c[0], t.vertices.c[1], p}};
-    float a1 = TriangleDoubleArea(t1);
-    float a2 = TriangleDoubleArea(t2);
-    float a3 = TriangleDoubleArea(t3);
+    struct Vec3 ray_cross_e2 = Vec3Cross(ray.direction, edge2);
+    float det = Vec3Dot(edge1, ray_cross_e2);
 
-    if (a < (a1 + a2 + a3) - 1e-5 * a) {
-        return Vec3(-1, -1, -1);
-    }
+    if (fabs(det) < epsilon)
+        return hit; // Ray is parallel to triangle
 
-    return Vec3(a1/a, a2/a, a3/a);
-}
+    float inv_det = 1.0 / det;
+    struct Vec3 s = Vec3Sub(ray.origin, triangle.vertices.c[0]);
+    float u = inv_det * Vec3Dot(s, ray_cross_e2);
 
-static inline struct HitPoint IntersectionTriangle(struct Ray ray, struct Triangle triangle) {
-    struct Plane plane;
-    float area;
-    plane.normal = TriangleNormal(triangle, &area);
+    if (u < -epsilon || u - 1 > epsilon)
+        return hit; // Ray passes outside edge2's bounds
 
-    if (Vec3Dot(ray.direction, plane.normal) < 0.0) {
-        plane.normal = Vec3Mul(plane.normal, -1);
-    }
+    struct Vec3 s_cross_e1 = Vec3Cross(s, edge1);
+    float v = inv_det * Vec3Dot(ray.direction, s_cross_e1);
 
-    plane.origin = triangle.vertices.c[0];
+    if (v < -epsilon || u + v - 1 > epsilon)
+        return hit; // Ray passes outside edge1's bounds
 
-    struct HitPoint hit = IntersectionPlane(ray, plane);
-    if (!hit.hit) {
+    // The ray line intersects with the triangle.
+    // We compute t to find where on the ray the intersection is.
+    float t = inv_det * Vec3Dot(edge2, s_cross_e1);
+
+    if (t > epsilon) {// Ray intersection
+        hit.point = Vec3Add(ray.origin, Vec3Mul(ray.direction, t));
+        hit.hit = true;
+        hit.normal = Vec3Mul(Vec3Normalize(normal), -1);
+        hit.distance = t;
+        hit.barycentric = Vec3(1 - u - v, u, v);
         return hit;
     }
-
-    hit.barycentric = PointTriangleIntersection(hit.point, triangle, area);
-    if (hit.barycentric.x < 0) {
-        hit.hit = false;
-    }
+    // This means that there is a line intersection but not a ray intersection.
     return hit;
 }
 
