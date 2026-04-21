@@ -29,6 +29,10 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
             sscanf(current_line, "newmtl %s", materials[(*materialCount)-1].name);
             materials[(*materialCount)-1].color = Vec3(1.0, 1.0, 1.0);
             materials[(*materialCount)-1].emissionColor = Vec3(0.0, 0.0, 0.0);
+            materials[(*materialCount)-1].emissionIntensity = 0.0;
+            materials[(*materialCount)-1].metallic = 0;
+            materials[(*materialCount)-1].transmissive = 0;
+            materials[(*materialCount)-1].roughness = 0.5;
             materials[(*materialCount)-1].texture = NULL;
         }
         if (begins("Ka", current_line) == 0) {

@@ -59,7 +59,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     last_time = SDL_GetTicks();
 
 
-    scene.mesh = ImportObj("../Objs/Camera.obj");
+    scene.mesh = ImportObj("../Objs/RoughnessTest.obj");
     scene.bvhRoot = BuildBVH(scene.mesh.triangles, scene.mesh.triangleCount);
 
     scene.sun = (struct Sun){.dir={0, -1, 0}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};

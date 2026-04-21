@@ -195,7 +195,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
     nk_end(ctx);
 
     /* Materials */
-    if (nk_begin(ctx, "Materials", nk_rect(548, 16, 250, 250),
+    if (nk_begin(ctx, "Materials", nk_rect(548, 16, 250, 280),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {
@@ -222,7 +222,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         nk_layout_row_dynamic(ctx, 25, 1);
         scene->mesh.material[settings->selectedMaterial].roughness = nk_propertyf(ctx, "Roughness", 0, scene->mesh.material[settings->selectedMaterial].roughness, 1.0f, 0.01f,0.005f);
         scene->mesh.material[settings->selectedMaterial].metallic = nk_propertyf(ctx, "Metallic", 0, scene->mesh.material[settings->selectedMaterial].metallic, 1.0f, 0.01f,0.005f);
-        scene->mesh.material[settings->selectedMaterial].ior = nk_propertyf(ctx, "IOR", 1.0f, scene->mesh.material[settings->selectedMaterial].ior, 4.0f, 0.01f,0.005f);
+        scene->mesh.material[settings->selectedMaterial].ior = nk_propertyf(ctx, "IOR", 1.0f, scene->mesh.material[settings->selectedMaterial].ior, 10.0f, 0.01f,0.005f);
         nk_layout_row_dynamic(ctx, 25, 2);
         nk_label(ctx, "Emission Color", NK_TEXT_LEFT);
         struct nk_colorf emissionColor = {scene->mesh.material[settings->selectedMaterial].emissionColor.x, scene->mesh.material[settings->selectedMaterial].emissionColor.y, scene->mesh.material[settings->selectedMaterial].emissionColor.z, 1.0f};
@@ -240,6 +240,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         scene->mesh.material[settings->selectedMaterial].emissionColor.z = emissionColor.b;
         nk_layout_row_dynamic(ctx, 25, 1);
         scene->mesh.material[settings->selectedMaterial].emissionIntensity = nk_propertyf(ctx, "Emission intensity", 0.0f, scene->mesh.material[settings->selectedMaterial].emissionIntensity, 100.0f, 0.01f,0.01f);
+        scene->mesh.material[settings->selectedMaterial].transmissive = nk_propertyf(ctx, "Transmissive", 0.0f, scene->mesh.material[settings->selectedMaterial].transmissive, 1.0f, 0.01f,0.005f);
     }
     nk_end(ctx);
 }

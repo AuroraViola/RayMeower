@@ -6,6 +6,10 @@
 
 #define PI 3.14159265
 
+// Avoid funcion call
+#define fmin(a,b) (((a) < (b)) ? (a) : (b))
+#define fmax(a,b) (((a) > (b)) ? (a) : (b))
+
 struct Vec2 {
     float x;
     float y;
@@ -26,6 +30,7 @@ struct Material {
     struct Vec3 color;
     float metallic;
     float roughness;
+    float transmissive;
     struct Vec3 emissionColor;
     float emissionIntensity;
     float ior;
@@ -317,14 +322,15 @@ static inline float TriangleDoubleArea(struct Triangle t) {
     return Vec3Length(Vec3Cross(v1, v2));
 }
 
-static inline struct Vec3 TriangleNormal(struct Triangle t) {
+static inline struct Vec3 TriangleNormal(struct Triangle t, float *a) {
     struct Vec3 v1 = Vec3Sub(t.vertices.c[1], t.vertices.c[0]);
     struct Vec3 v2 = Vec3Sub(t.vertices.c[2], t.vertices.c[0]);
-    return Vec3Normalize(Vec3Cross(v1, v2));
+    struct Vec3 c = Vec3Cross(v1, v2);
+    *a = Vec3Length(c);
+    return Vec3DivScalar(c, *a);
 }
 
-static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triangle t) {
-    float a = TriangleDoubleArea(t);
+static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triangle t, float a) {
     struct Triangle t1 = {.vertices = {t.vertices.c[1], t.vertices.c[2], p}};
     struct Triangle t2 = {.vertices = {t.vertices.c[0], t.vertices.c[2], p}};
     struct Triangle t3 = {.vertices = {t.vertices.c[0], t.vertices.c[1], p}};
@@ -341,7 +347,8 @@ static inline struct Vec3 PointTriangleIntersection(struct Vec3 p, struct Triang
 
 static inline struct HitPoint IntersectionTriangle(struct Ray ray, struct Triangle triangle) {
     struct Plane plane;
-    plane.normal = TriangleNormal(triangle);
+    float area;
+    plane.normal = TriangleNormal(triangle, &area);
 
     if (Vec3Dot(ray.direction, plane.normal) < 0.0) {
         plane.normal = Vec3Mul(plane.normal, -1);
@@ -354,7 +361,7 @@ static inline struct HitPoint IntersectionTriangle(struct Ray ray, struct Triang
         return hit;
     }
 
-    hit.barycentric = PointTriangleIntersection(hit.point, triangle);
+    hit.barycentric = PointTriangleIntersection(hit.point, triangle, area);
     if (hit.barycentric.x < 0) {
         hit.hit = false;
     }
