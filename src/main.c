@@ -189,6 +189,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
     hit = BVHHit(r, scene.bvhRoot, 0, &index, &triangleID);
     if (hit.hit) {
         color = Vec3(0, 0, 0);
+        float roughness = scene.mesh.material[index].roughness;
         struct Vec3 hitColor = scene.mesh.material[index].color;
         if (scene.mesh.material[index].texture != NULL) {
             struct Vec3 uvs[3];
@@ -211,6 +212,14 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             struct Mat3 normalTbn = TbnUv(hit.normal, triangleID);
             hit.normal = Mat3Vec3Mul(Mat3Transpose(normalTbn), hitNormal);
         }
+        if (scene.mesh.material[index].roughnessMap != NULL) {
+            struct Vec3 uvs[3];
+            uvs[0] = Vec2ToVec3(triangleID->uv[0]);
+            uvs[1] = Vec2ToVec3(triangleID->uv[1]);
+            uvs[2] = Vec2ToVec3(triangleID->uv[2]);
+            struct Vec2 uv = Vec3ToVec2(InterpolateAttribute(hit, uvs));
+            roughness = SampleTexture(scene.mesh.material[index].roughnessMap, uv).x;
+        }
 
         // Apply Reflections
         struct Vec3 incidentVector = r.direction;
@@ -219,8 +228,6 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         float randTrans = (float)SDL_rand(1000000) / 1000000.0f;
 
         float fresnel = Lerp(scene.mesh.material[index].metallic, 1, FresnelDielectric(cosTheta, scene.mesh.material[index].ior));
-        //color = Vec3(fresnel, fresnel, fresnel);
-        //return color;
         if (fresnel > rand) {
             struct Mat3 tbn = Tbn(cosTheta < 0 ? Vec3Mul(hit.normal, -1) : hit.normal);
             struct Vec3 tbnIncident = Mat3Vec3Mul(tbn, incidentVector);
@@ -228,7 +235,6 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             u.x = (float)SDL_rand(1000000) / 1000000.0f;
             u.y = (float)SDL_rand(1000000) / 1000000.0f;
 
-            float roughness = scene.mesh.material[index].roughness;
             struct Vec3 tbnNormal = sampleGgxVndf(tbnIncident, Vec2(roughness, roughness), u);
             struct Vec3 tbnReflected = Reflect(tbnIncident, tbnNormal);
 
@@ -314,7 +320,6 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             u.x = (float)SDL_rand(1000000) / 1000000.0f;
             u.y = (float)SDL_rand(1000000) / 1000000.0f;
 
-            float roughness = scene.mesh.material[index].roughness;
             struct Vec3 tbnNormal = sampleGgxVndf(tbnIncident, Vec2(roughness, roughness), u);
             struct Vec3 tbnRefracted = Refract(tbnIncident, cosTheta < 0 ? Vec3Mul(tbnNormal, -1) : tbnNormal, scene.mesh.material[index].ior);
 

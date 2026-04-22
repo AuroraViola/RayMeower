@@ -1,9 +1,9 @@
 - Materials
   - ~~Metallic~~
   - ~~Dielectric~~
-  - Transmissive
-  - Normal map
-  - Roughness map
+  - ~~Transmissive~~
+  - ~~Normal map~~
+  - ~~Roughness map~~
   - Metal map
 - Point light soft shadow
 - ~~Sun soft shadow~~

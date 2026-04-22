@@ -36,6 +36,7 @@ struct Material {
     float emissionIntensity;
     float ior;
     SDL_Surface *texture;
+    SDL_Surface *roughnessMap;
     SDL_Surface *normalMap;
 };
 
@@ -419,6 +420,12 @@ static inline struct Vec3 SampleTexture(SDL_Surface *surface, struct Vec2 uv) {
     const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surface->format);
     int pixelSize = details->bytes_per_pixel;
     void *pixel = surface->pixels + x * pixelSize + y * surface->pitch;
+
+    // Gray-scale RGB (used in roughness map)
+    if (pixelSize == 1) {
+        uint8_t value = *(uint8_t*)pixel;
+        return Vec3(value / 255.0, value / 255.0, value / 255.0);
+    }
     uint32_t packedPixel = *(uint32_t*)pixel;
     uint8_t rgb[3];
     SDL_GetRGB(packedPixel, details, NULL, &rgb[0], &rgb[1], &rgb[2]);
