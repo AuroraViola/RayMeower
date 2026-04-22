@@ -59,7 +59,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     last_time = SDL_GetTicks();
 
 
-    scene.mesh = ImportObj("../Objs/Camera.obj");
+    scene.mesh = ImportObj("../Objs/Test.obj");
     scene.bvhRoot = BuildBVH(scene.mesh.triangles, scene.mesh.triangleCount);
 
     scene.sun = (struct Sun){.dir={0, -1, 0}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};
@@ -189,16 +189,28 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
     hit = BVHHit(r, scene.bvhRoot, 0, &index, &triangleID);
     if (hit.hit) {
         color = Vec3(0, 0, 0);
-        struct Vec3 hitcolor = scene.mesh.material[index].color;
+        struct Vec3 hitColor = scene.mesh.material[index].color;
         if (scene.mesh.material[index].texture != NULL) {
             struct Vec3 uvs[3];
             uvs[0] = Vec2ToVec3(triangleID->uv[0]);
             uvs[1] = Vec2ToVec3(triangleID->uv[1]);
             uvs[2] = Vec2ToVec3(triangleID->uv[2]);
             struct Vec2 uv = Vec3ToVec2(InterpolateAttribute(hit, uvs));
-            hitcolor = SampleTexture(scene.mesh.material[index].texture, uv);
+            hitColor = SampleTexture(scene.mesh.material[index].texture, uv);
         }
-
+        if (scene.mesh.material[index].normalMap != NULL) {
+            struct Vec3 uvs[3];
+            uvs[0] = Vec2ToVec3(triangleID->uv[0]);
+            uvs[1] = Vec2ToVec3(triangleID->uv[1]);
+            uvs[2] = Vec2ToVec3(triangleID->uv[2]);
+            struct Vec2 uv = Vec3ToVec2(InterpolateAttribute(hit, uvs));
+            struct Vec3 hitNormal = SampleTexture(scene.mesh.material[index].normalMap, uv);
+            hitNormal = Vec3Sub(Vec3Mul(hitNormal, 255.0/127.0), Vec3(128.0/127.0, 128.0/127.0, 128.0/127.0));
+            hitNormal.x = -hitNormal.x;
+            hitNormal.y = -hitNormal.y;
+            struct Mat3 normalTbn = TbnUv(hit.normal, triangleID);
+            hit.normal = Mat3Vec3Mul(Mat3Transpose(normalTbn), hitNormal);
+        }
 
         // Apply Reflections
         struct Vec3 incidentVector = r.direction;
@@ -224,14 +236,14 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             reflectionRay.direction = Mat3Vec3Mul(Mat3Transpose(tbn), tbnReflected);
             reflectionRay.origin = Vec3Add(hit.point, Vec3Mul(reflectionRay.direction, 0.001));
             struct Vec3 refColor = Shade(reflectionRay, depth - 1);
-            color.x += refColor.x * Lerp(1, hitcolor.x, scene.mesh.material[index].metallic);
-            color.y += refColor.y * Lerp(1, hitcolor.y, scene.mesh.material[index].metallic);
-            color.z += refColor.z * Lerp(1, hitcolor.z, scene.mesh.material[index].metallic);
+            color.x += refColor.x * Lerp(1, hitColor.x, scene.mesh.material[index].metallic);
+            color.y += refColor.y * Lerp(1, hitColor.y, scene.mesh.material[index].metallic);
+            color.z += refColor.z * Lerp(1, hitColor.z, scene.mesh.material[index].metallic);
         }
         // Apply diffuse global illumination
         else if (randTrans > scene.mesh.material[index].transmissive) {
             // Apply sun contribution
-            color = hitcolor;
+            color = hitColor;
             float d = Vec3Dot(scene.sun.dir, hit.normal) * scene.sun.intensity;
             if (d < 0)
                 d = 0;
@@ -261,7 +273,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
 
             // Apply lights contribution
             for (int i = 0; i < scene.lightsCount; i++) {
-                struct Vec3 tempColor = hitcolor;
+                struct Vec3 tempColor = hitColor;
                 struct Vec3 incidentVector = Vec3Sub(hit.point, scene.lights[i].pos);
                 float distance = Vec3Length(incidentVector);
                 incidentVector = Vec3Normalize(incidentVector);
@@ -290,9 +302,9 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             diffuseRay.direction = cosWeightedRandomHemisphereDirection(Vec3Mul(hit.normal, -1));
             diffuseRay.origin = Vec3Add(hit.point, Vec3Mul(diffuseRay.direction, 0.001));
             struct Vec3 refDiffuseColor = Shade(diffuseRay, depth - 1);
-            color.x += refDiffuseColor.x * hitcolor.x;
-            color.y += refDiffuseColor.y * hitcolor.y;
-            color.z += refDiffuseColor.z * hitcolor.z;
+            color.x += refDiffuseColor.x * hitColor.x;
+            color.y += refDiffuseColor.y * hitColor.y;
+            color.z += refDiffuseColor.z * hitColor.z;
         }
         // Transmissive
         else {
@@ -310,9 +322,9 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             transRay.direction = Mat3Vec3Mul(Mat3Transpose(tbn), tbnRefracted);
             transRay.origin = Vec3Add(hit.point, Vec3Mul(transRay.direction, 0.001));
             struct Vec3 transColor = Shade(transRay, depth - 1);
-            color.x += transColor.x * hitcolor.x;
-            color.y += transColor.y * hitcolor.y;
-            color.z += transColor.z * hitcolor.z;
+            color.x += transColor.x * hitColor.x;
+            color.y += transColor.y * hitColor.y;
+            color.z += transColor.z * hitColor.z;
         }
 
         // Apply emission

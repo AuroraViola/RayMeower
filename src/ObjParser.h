@@ -69,6 +69,13 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
             ResolvePath(path, filename, texturePath);
             materials[(*materialCount)-1].texture = IMG_Load(texturePath);
         }
+        if (begins("map_bump", current_line) == 0) {
+            char filename[256];
+            sscanf(current_line, "map_bump %s", filename);
+            char texturePath[256];
+            ResolvePath(path, filename, texturePath);
+            materials[(*materialCount)-1].normalMap = IMG_Load(texturePath);
+        }
     }
     return materials;
 }

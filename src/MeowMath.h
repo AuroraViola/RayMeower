@@ -36,6 +36,7 @@ struct Material {
     float emissionIntensity;
     float ior;
     SDL_Surface *texture;
+    SDL_Surface *normalMap;
 };
 
 struct Sphere {
@@ -504,6 +505,35 @@ static inline struct Mat3 Tbn(struct Vec3 n) {
 
     TBN.c[0] = u;
     TBN.c[1] = Vec3Cross(n, u);
+    TBN.c[2] = n;
+
+    return TBN;
+}
+
+static inline struct Mat3 TbnUv(struct Vec3 n, struct Triangle *t) {
+    struct Vec3 edge1 = Vec3Sub(t->vertices.c[1], t->vertices.c[0]);
+    struct Vec3 edge2 = Vec3Sub(t->vertices.c[2], t->vertices.c[0]);
+    struct Vec3 deltaUv1 = Vec3Sub(Vec2ToVec3(t->uv[1]), Vec2ToVec3(t->uv[0]));
+    struct Vec3 deltaUv2 = Vec3Sub(Vec2ToVec3(t->uv[2]), Vec2ToVec3(t->uv[0]));
+
+
+    float f = 1.0f / (deltaUv1.x * deltaUv2.y - deltaUv2.x * deltaUv1.y);
+
+    struct Vec3 tangent;
+    struct Vec3 bitangent;
+
+    tangent.x = f * (deltaUv2.y * edge1.x - deltaUv1.y * edge2.x);
+    tangent.y = f * (deltaUv2.y * edge1.y - deltaUv1.y * edge2.y);
+    tangent.z = f * (deltaUv2.y * edge1.z - deltaUv1.y * edge2.z);
+
+    bitangent.x = f * (-deltaUv2.x * edge1.x + deltaUv1.x * edge2.x);
+    bitangent.y = f * (-deltaUv2.x * edge1.y + deltaUv1.x * edge2.y);
+    bitangent.z = f * (-deltaUv2.x * edge1.z + deltaUv1.x * edge2.z);
+
+    struct Mat3 TBN;
+
+    TBN.c[0] = Vec3Normalize(tangent);
+    TBN.c[1] = Vec3Normalize(bitangent);
     TBN.c[2] = n;
 
     return TBN;
