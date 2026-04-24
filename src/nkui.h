@@ -195,7 +195,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
     nk_end(ctx);
 
     /* Materials */
-    if (nk_begin(ctx, "Materials", nk_rect(548, 16, 250, 280),
+    if (nk_begin(ctx, "Materials", nk_rect(548, 16, 250, 370),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {
@@ -241,6 +241,9 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         nk_layout_row_dynamic(ctx, 25, 1);
         scene->mesh.material[settings->selectedMaterial].emissionIntensity = nk_propertyf(ctx, "Emission intensity", 0.0f, scene->mesh.material[settings->selectedMaterial].emissionIntensity, 100.0f, 0.01f,0.01f);
         scene->mesh.material[settings->selectedMaterial].transmissive = nk_propertyf(ctx, "Transmissive", 0.0f, scene->mesh.material[settings->selectedMaterial].transmissive, 1.0f, 0.01f,0.005f);
+        scene->mesh.material[settings->selectedMaterial].enableTexture = nk_check_label(ctx, "Diffuse map", scene->mesh.material[settings->selectedMaterial].enableTexture);
+        scene->mesh.material[settings->selectedMaterial].enableRoughnessMap = nk_check_label(ctx, "Roughness map", scene->mesh.material[settings->selectedMaterial].enableRoughnessMap);
+        scene->mesh.material[settings->selectedMaterial].enableNormalMap = nk_check_label(ctx, "Normal map", scene->mesh.material[settings->selectedMaterial].enableNormalMap);
     }
     nk_end(ctx);
 }

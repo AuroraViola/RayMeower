@@ -36,6 +36,9 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
             materials[(*materialCount)-1].texture = NULL;
             materials[(*materialCount)-1].normalMap = NULL;
             materials[(*materialCount)-1].roughnessMap = NULL;
+            materials[(*materialCount)-1].enableTexture = true;
+            materials[(*materialCount)-1].enableNormalMap = true;
+            materials[(*materialCount)-1].enableRoughnessMap = true;
         }
         if (begins("Ka", current_line) == 0) {
             sscanf(current_line, "Ka %f", &materials[(*materialCount)-1].metallic);

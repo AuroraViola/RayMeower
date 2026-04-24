@@ -39,6 +39,9 @@ struct Material {
     SDL_Surface *texture;
     SDL_Surface *roughnessMap;
     SDL_Surface *normalMap;
+    bool enableTexture;
+    bool enableRoughnessMap;
+    bool enableNormalMap;
 };
 
 struct Sphere {

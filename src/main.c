@@ -200,7 +200,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         hit.normal = Vec3Mul(InterpolateAttribute(hit, vNormals), -1);
 
         // Apply diffuse texture
-        if (scene.mesh.material[index].texture != NULL) {
+        if (scene.mesh.material[index].texture != NULL && scene.mesh.material[index].enableTexture) {
             struct Vec3 uvs[3];
             uvs[0] = Vec2ToVec3(triangleID->uv[0]);
             uvs[1] = Vec2ToVec3(triangleID->uv[1]);
@@ -209,7 +209,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             hitColor = SampleTexture(scene.mesh.material[index].texture, uv);
         }
         // Apply normal map
-        if (scene.mesh.material[index].normalMap != NULL) {
+        if (scene.mesh.material[index].normalMap != NULL && scene.mesh.material[index].enableNormalMap) {
             struct Vec3 uvs[3];
             uvs[0] = Vec2ToVec3(triangleID->uv[0]);
             uvs[1] = Vec2ToVec3(triangleID->uv[1]);
@@ -223,7 +223,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             hit.normal = Mat3Vec3Mul(Mat3Transpose(normalTbn), hitNormal);
         }
         // Apply roughnessMap
-        if (scene.mesh.material[index].roughnessMap != NULL) {
+        if (scene.mesh.material[index].roughnessMap != NULL && scene.mesh.material[index].enableRoughnessMap) {
             struct Vec3 uvs[3];
             uvs[0] = Vec2ToVec3(triangleID->uv[0]);
             uvs[1] = Vec2ToVec3(triangleID->uv[1]);
