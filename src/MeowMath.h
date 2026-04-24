@@ -10,6 +10,7 @@
 #define fmin(a,b) (((a) < (b)) ? (a) : (b))
 #define fmax(a,b) (((a) > (b)) ? (a) : (b))
 #define fabs(a) fmax(a, -a)
+#define DIV_ROUND_UP(a, b) ((a + b - 1) / b)
 
 struct Vec2 {
     float x;
@@ -413,8 +414,15 @@ static inline struct Vec3 InterpolateAttribute(struct HitPoint hit, struct Vec3 
 }
 
 static inline struct Vec3 SampleTexture(SDL_Surface *surface, struct Vec2 uv) {
-    uint32_t x = uv.x * surface->w;
-    uint32_t y = (1.0-uv.y) * surface->h;
+    uv.y = 1.0 - uv.y;
+    int32_t x = (uv.x * surface->w) >= 0 ? uv.x * surface->w : uv.x * surface->w - 1;
+    int32_t y = uv.y * surface->h >= 0 ? uv.y * surface->h : uv.y * surface->h - 1;
+    if (x < 0) {
+        x += DIV_ROUND_UP(-x, surface->w) * surface->w;
+    }
+    if (y < 0) {
+        y += DIV_ROUND_UP(-y, surface->h) * surface->h;
+    }
     x %= surface->w;
     y %= surface->h;
 
