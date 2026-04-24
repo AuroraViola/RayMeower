@@ -7,7 +7,7 @@
   - Metal map
 - Point light soft shadow
 - ~~Sun soft shadow~~
-- Smooth shading
+- ~~Smooth shading~~
 - Tent filtering
 - Tone mapping
 - Gamma

@@ -191,6 +191,15 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         color = Vec3(0, 0, 0);
         float roughness = scene.mesh.material[index].roughness;
         struct Vec3 hitColor = scene.mesh.material[index].color;
+
+        // Apply smooth shading
+        struct Vec3 vNormals[3];
+        vNormals[0] = triangleID->normals[0];
+        vNormals[1] = triangleID->normals[1];
+        vNormals[2] = triangleID->normals[2];
+        hit.normal = Vec3Mul(InterpolateAttribute(hit, vNormals), -1);
+
+        // Apply diffuse texture
         if (scene.mesh.material[index].texture != NULL) {
             struct Vec3 uvs[3];
             uvs[0] = Vec2ToVec3(triangleID->uv[0]);
@@ -199,6 +208,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             struct Vec2 uv = Vec3ToVec2(InterpolateAttribute(hit, uvs));
             hitColor = SampleTexture(scene.mesh.material[index].texture, uv);
         }
+        // Apply normal map
         if (scene.mesh.material[index].normalMap != NULL) {
             struct Vec3 uvs[3];
             uvs[0] = Vec2ToVec3(triangleID->uv[0]);
@@ -212,6 +222,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
             struct Mat3 normalTbn = TbnUv(hit.normal, triangleID);
             hit.normal = Mat3Vec3Mul(Mat3Transpose(normalTbn), hitNormal);
         }
+        // Apply roughnessMap
         if (scene.mesh.material[index].roughnessMap != NULL) {
             struct Vec3 uvs[3];
             uvs[0] = Vec2ToVec3(triangleID->uv[0]);
@@ -338,6 +349,7 @@ static inline struct Vec3 Shade(struct Ray r, int depth) {
         color.z += scene.mesh.material[index].emissionColor.z * scene.mesh.material[index].emissionIntensity;
     }
     else {
+        // Sun
         if (-Vec3Dot(r.direction, scene.sun.dir) > cosf(scene.sun.angle / 180 * PI)) {
             color = Vec3Mul(scene.sun.color, scene.sun.intensity);
         }

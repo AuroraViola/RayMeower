@@ -54,6 +54,7 @@ struct Ray {
 
 struct Triangle {
     struct Mat3 vertices;
+    struct Vec3 normals[3];
     struct Vec2 uv[3];
     uint16_t materialIndex;
 };

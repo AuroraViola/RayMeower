@@ -34,6 +34,8 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
             materials[(*materialCount)-1].transmissive = 0;
             materials[(*materialCount)-1].roughness = 0.5;
             materials[(*materialCount)-1].texture = NULL;
+            materials[(*materialCount)-1].normalMap = NULL;
+            materials[(*materialCount)-1].roughnessMap = NULL;
         }
         if (begins("Ka", current_line) == 0) {
             sscanf(current_line, "Ka %f", &materials[(*materialCount)-1].metallic);
@@ -90,8 +92,10 @@ static inline struct Material *ImportMtl(const char *path, int *materialCount) {
 static inline struct Mesh ImportObj(const char *path){
     struct Vec3 *vertices = (struct Vec3 *)malloc(sizeof(struct Vec3) * 819200);
     struct Vec2 *uv = (struct Vec2 *)malloc(sizeof(struct Vec2) * 819200);
+    struct Vec3 *normals = (struct Vec3 *)malloc(sizeof(struct Vec3) * 819200);
     int vertexCount = 0;
     int uvCount = 0;
+    int normalCount = 0;
     struct Mesh m;
     m.triangles = (struct Triangle *)malloc(sizeof(struct Triangle) * 1000000);
     int triangleCount = 0;
@@ -107,6 +111,11 @@ static inline struct Mesh ImportObj(const char *path){
                     vertices[vertexCount].x *= -1;
                     vertexCount++;
                 }
+                else if (current_line[1] == 'n') {
+                    sscanf(current_line, "vn %f %f %f", &normals[normalCount].x, &normals[normalCount].y, &normals[normalCount].z);
+                    normals[normalCount].x *= -1;
+                    normalCount++;
+                }
                 else if (current_line[1] == 't') {
                     sscanf(current_line, "vt %f %f", &uv[uvCount].x, &uv[uvCount].y);
                     uvCount++;
@@ -115,14 +124,18 @@ static inline struct Mesh ImportObj(const char *path){
             case 'f':
                 int indexs[3] = {0};
                 int uvIndex[3] = {0};
-                if (sscanf(current_line, "f %d/%d/%*d %d/%d/%*d %d/%d/%*d", &indexs[0], &uvIndex[0], &indexs[1], &uvIndex[1], &indexs[2], &uvIndex[2]) != 6);
-                    sscanf(current_line, "f %d//%*d %d//%*d %d//%*d", &indexs[0], &indexs[1], &indexs[2]);
+                int normalIndex[3] = {0};
+                if (sscanf(current_line, "f %d/%d/%d %d/%d/%d %d/%d/%d", &indexs[0], &uvIndex[0], &normalIndex[0], &indexs[1], &uvIndex[1], &normalIndex[1], &indexs[2], &uvIndex[2], &normalIndex[2]) != 9);
+                    sscanf(current_line, "f %d//%d %d//%d %d//%d", &indexs[0], &normalIndex[0], &indexs[1], &normalIndex[1], &indexs[2], &normalIndex[2]);
                 m.triangles[triangleCount].vertices.c[0] = vertices[indexs[0]-1];
                 m.triangles[triangleCount].vertices.c[1] = vertices[indexs[1]-1];
                 m.triangles[triangleCount].vertices.c[2] = vertices[indexs[2]-1];
                 m.triangles[triangleCount].uv[0] = uv[uvIndex[0]-1];
                 m.triangles[triangleCount].uv[1] = uv[uvIndex[1]-1];
                 m.triangles[triangleCount].uv[2] = uv[uvIndex[2]-1];
+                m.triangles[triangleCount].normals[0] = normals[normalIndex[0]-1];
+                m.triangles[triangleCount].normals[1] = normals[normalIndex[1]-1];
+                m.triangles[triangleCount].normals[2] = normals[normalIndex[2]-1];
                 m.triangles[triangleCount].materialIndex = currentMaterial;
                 triangleCount++;
                 break;
