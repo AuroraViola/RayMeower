@@ -23,7 +23,7 @@ $ sudo dnf install git gcc cmake SDL3-devel SDL3_image-devel
 
 Clone the repo:
 ```
-$ git clone https://github.com/AuroraViola/RayMeower
+$ git clone https://github.com/AuroraViola/RayMeower --recursive
 $ cd RayMeower
 ```
 
