@@ -6,6 +6,7 @@
 #include "ObjParser.h"
 #include "bvh.h"
 #include "nkui.h"
+#include "vk.h"
 
 /* We will use this renderer to draw into this window every frame. */
 static SDL_Window *window = NULL;
@@ -86,7 +87,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     mutex = SDL_CreateMutex();
 
-    SDL_Thread *renderThread = SDL_CreateThread(RenderThread, "RenderThread", NULL);
+    //SDL_Thread *renderThread = SDL_CreateThread(RenderThread, "RenderThread", NULL);
+    CreateVk(s.width, s.height);
 
     return SDL_APP_CONTINUE;
 }
@@ -416,14 +418,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_FRect fr = {0, 0, width, height};
     SDL_Rect r = {0, 0, width, height};
 
-
+    RunVk(s.width, s.height);
     uint32_t *pixels;
     int pitch;
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);
     SDL_LockMutex(mutex);
     for (int x = 0; x < width; x++) {
         for (int y = 0; y < height; y++) {
-            ((uint32_t*)((void*)pixels + y * pitch))[x] = pixel[s.renderMode ? currentRender : !currentRender][x][y];
+            ((uint32_t*)((void*)pixels + y * pitch))[x] = PackColor(frameBuffer[x + y * s.width]);
         }
     }
     SDL_UnlockMutex(mutex);

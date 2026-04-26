@@ -567,4 +567,18 @@ static inline struct Vec2 UniformRandomCirclePoint(float radius, struct Vec2 u) 
     };
 }
 
+static inline uint32_t PackColor(struct Vec3 color) {
+    if (color.x > 1) {
+        color.x = 1;
+    }
+    if (color.y > 1) {
+        color.y = 1;
+    }
+    if (color.z > 1) {
+        color.z = 1;
+    }
+
+    return 0xff | ((uint32_t)(color.x*255)) << 24 | ((uint32_t)(color.y*255)) << 16 | ((uint32_t)(color.z*255)) << 8;
+}
+
 #endif //RAYMEOWER_MEOWMATH_H

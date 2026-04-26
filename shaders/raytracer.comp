@@ -1,0 +1,119 @@
+#version 460
+
+#extension GL_EXT_scalar_block_layout: enable
+
+layout(scalar) struct Ray {
+    vec3 origin;
+    vec3 direction;
+};
+
+layout(scalar) struct AABB {
+    vec3 min;
+    vec3 max;
+};
+
+layout(scalar) struct HitPoint {
+    bool hit;
+    vec3 point;
+    vec3 normal;
+    vec3 barycentric;
+    float distance;
+};
+
+layout(scalar) struct Triangle {
+    mat3 vertices;
+    mat3 normals;
+    mat3x2 uv;
+    int materialIndex;
+};
+
+HitPoint TriangleIntersection(Ray ray, Triangle triangle) {
+    HitPoint hit;
+    hit.hit = false;
+    hit.barycentric = vec3(0, 0, 0);
+
+    float epsilon = 1e-5;
+
+    vec3 edge1 = triangle.vertices[1] - triangle.vertices[0];
+    vec3 edge2 = triangle.vertices[2] - triangle.vertices[0];
+
+    // Backface culling, assuming CCW-wound triangles.
+    const vec3 normal = -cross(edge1, edge2); // No need to normalize
+
+    vec3 ray_cross_e2 = cross(ray.direction, edge2);
+    float det = dot(edge1, ray_cross_e2);
+
+    if (abs(det) < epsilon)
+        return hit; // Ray is parallel to triangle
+
+    float inv_det = 1.0 / det;
+    vec3 s = ray.origin - triangle.vertices[0];
+    float u = inv_det * dot(s, ray_cross_e2);
+
+    if (u < -epsilon || u - 1 > epsilon)
+        return hit; // Ray passes outside edge2's bounds
+
+    vec3 s_cross_e1 = cross(s, edge1);
+    float v = inv_det * dot(ray.direction, s_cross_e1);
+
+    if (v < -epsilon || u + v - 1 > epsilon)
+        return hit; // Ray passes outside edge1's bounds
+
+    // The ray line intersects with the triangle.
+    // We compute t to find where on the ray the intersection is.
+    float t = inv_det * dot(edge2, s_cross_e1);
+
+    if (t > epsilon) // Ray intersection
+    {
+        hit.point = ray.origin + (ray.direction * t);
+        hit.hit = true;
+        hit.normal = -normalize(normal);
+        hit.distance = t;
+        hit.barycentric = vec3(1 - u - v, u, v);
+        return hit;
+    }
+    else // This means that there is a line intersection but not a ray intersection.
+    return hit;
+}
+
+bool IntersectionAABB(Ray ray, AABB aabb) {
+    vec3 vtmin = (aabb.min - ray.origin) / ray.direction;
+    vec3 vtmax = (aabb.max - ray.origin) / ray.direction;
+
+    vec3 tmin = min(vtmin, vtmax);
+    vec3 tmax = max(vtmin, vtmax);
+
+    float enter = max(tmin.x, max(tmin.y, tmin.z));
+    float exit = min(tmax.x, min(tmax.y, tmax.z));
+
+    return exit > 0.0 && exit > enter;
+}
+
+layout(local_size_x=16, local_size_y=16, local_size_z=1) in;
+
+layout(scalar, set=0, binding=0) buffer O {
+    vec3 a[];
+} o;
+
+layout(push_constant) uniform Pc{
+    int width;
+    int height;
+} pc;
+
+void main() {
+    uvec2 pos = gl_GlobalInvocationID.xy;
+
+    Ray r;
+    r.origin = vec3(0, 0, 0);
+    r.direction.x = float(pos.x) / float(pc.width) - 0.5;
+    r.direction.y = float(pos.y) / float(pc.height) - 0.5;
+    r.direction.y *= -float(pc.height)/float(pc.width);
+    r.direction.z = 0.5;
+    r.direction = normalize(r.direction);
+    Triangle t;
+    t.vertices[0] = vec3(-30, 0, 50);
+    t.vertices[1] = vec3(30, 0, 50);
+    t.vertices[2] = vec3(0, 40, 50);
+    HitPoint hit = TriangleIntersection(r, t);
+    o.a[pos.x + pos.y * pc.width] = hit.barycentric;
+}
