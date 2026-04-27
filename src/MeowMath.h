@@ -44,6 +44,23 @@ struct Material {
     bool enableNormalMap;
 };
 
+#pragma pack
+struct MaterialGpu {
+    struct Vec3 color;
+    float metallic;
+    float roughness;
+    float transmissive;
+    struct Vec3 emissionColor;
+    float emissionIntensity;
+    float ior;
+    int32_t texture;
+    int32_t roughnessMap;
+    int32_t normalMap;
+    int enableTexture;
+    int enableRoughnessMap;
+    int enableNormalMap;
+};
+
 struct Sphere {
     struct Vec3 origin;
     float radius;

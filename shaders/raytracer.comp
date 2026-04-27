@@ -2,6 +2,8 @@
 
 #extension GL_EXT_scalar_block_layout: enable
 
+#define PI 3.14159265
+
 layout(scalar) struct Ray {
     vec3 origin;
     vec3 direction;
@@ -34,9 +36,36 @@ layout(scalar) struct BvhNode {
     AABB aabb;
 };
 
+layout(scalar) struct Sun {
+    vec3 dir;
+    vec3 color;
+    float intensity;
+    float angle;
+};
+
+layout(scalar) struct Material {
+    vec3 color;
+    float metallic;
+    float roughness;
+    float transmissive;
+    vec3 emissionColor;
+    float emissionIntensity;
+    float ior;
+    int texture;
+    int roughnessMap;
+    int normalMap;
+    int enableTexture;
+    int enableRoughnessMap;
+    int enableNormalMap;
+};
+
 layout(scalar, set=0, binding=1) buffer Bvh {
     BvhNode node[];
 } bvh;
+
+layout(scalar, set=0, binding=2) buffer M {
+    Material material[];
+} material;
 
 HitPoint TriangleIntersection(Ray ray, Triangle triangle) {
     HitPoint hit;
@@ -83,7 +112,7 @@ HitPoint TriangleIntersection(Ray ray, Triangle triangle) {
         hit.barycentric = vec3(1 - u - v, u, v);
         return hit;
     }
-    else // This means that there is a line intersection but not a ray intersection.
+    // This means that there is a line intersection but not a ray intersection.
     return hit;
 }
 
@@ -115,7 +144,7 @@ bool IntersectionAABB(Ray ray, AABB aabb) {
 #define stack_len() \
     (stack_p)
 
-HitPoint BVHHit(Ray ray, out Triangle t) {
+HitPoint BVHHit(Ray ray, out Triangle t, out int node) {
     HitPoint hit;
     hit.hit = false;
     hit.barycentric = vec3(0);
@@ -131,6 +160,7 @@ HitPoint BVHHit(Ray ray, out Triangle t) {
             if (hit.hit == false || hit.distance > currentHit.distance) {
                 hit = currentHit;
                 t = bvh.node[currentNode].triangle;
+                node = currentNode;
             }
         }
         else {
@@ -148,6 +178,20 @@ HitPoint BVHHit(Ray ray, out Triangle t) {
     return hit;
 }
 
+vec2 seed;
+
+float hash12(vec2 p) {
+    vec3 p3  = fract(vec3(p.xyx) * .1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float rand() {
+    seed.x += 1.3;
+    seed.y += 1.7;
+    return hash12(seed);
+}
+
 layout(local_size_x=8, local_size_y=8, local_size_z=1) in;
 
 layout(scalar, set=0, binding=0) buffer O {
@@ -161,12 +205,134 @@ layout(push_constant, scalar) uniform Pc{
     mat3 rotmat;
 } pc;
 
+mat3 Tbn(vec3 n) {
+    vec3 u;
+    if(abs(n.z) > 0.0) {
+        u = vec3(0.0, -n.z, n.y)/ length(vec3(n.y, n.z, 0.0));
+    }
+    else {
+        u = vec3(n.y, -n.x, 0.0)/ length(vec3(n.x, n.y, 0.0));
+    }
+
+    mat3 TBN;
+    TBN[0] = u;
+    TBN[1] = cross(n, u);
+    TBN[2] = n;
+
+    return TBN;
+}
+
+vec2 UniformRandomCirclePoint(float radius, vec2 u) {
+    float alpha = u.x * 2 * PI;
+    radius = sqrt(u.y) * radius;
+    return vec2(radius * sin(alpha), radius * cos(alpha));
+}
+
+vec3 cosWeightedRandomHemisphereDirection(vec3 n) {
+    vec2 rv2;
+    rv2.x = rand();
+    rv2.y = rand();
+
+    vec3 uu = normalize(cross(n, vec3(0.0, 1.0, 1.0)));
+    vec3 vv = normalize(cross(uu, n));
+
+    float ra = sqrt(rv2.y);
+    float rx = ra * cos(6.2831 * rv2.x);
+    float ry = ra * sin(6.2831 * rv2.x);
+    float rz = sqrt(1.0 - rv2.y);
+    vec3 rr = uu * rx + vv * ry + n * rz;
+
+    return normalize(rr);
+}
+
+vec3 InterpolateAttribute(HitPoint hit, mat3 v) {
+    v[0] = v[0] * hit.barycentric.x;
+    v[1] = v[1] * hit.barycentric.y;
+    v[2] = v[2] * hit.barycentric.z;
+    return v[0] + v[1] +v[2];
+}
+
+float FresnelDielectric(float cosTheta, float ior) {
+    if (cosTheta < 0) {
+        cosTheta = -cosTheta;
+        ior = 1/ior;
+    }
+    float sin2ThetaI = 1 - cosTheta * cosTheta;
+    float sin2ThetaT = sin2ThetaI / (ior * ior);
+    if (sin2ThetaT >= 1) {
+        return 1.0f;
+    }
+    float cosThetaT = sqrt(1 - sin2ThetaT);
+
+    float rParl = (ior * cosTheta - cosThetaT) /
+    (ior * cosTheta + cosThetaT);
+    float rPerp = (cosTheta - ior * cosThetaT) /
+    (cosTheta + ior * cosThetaT);
+    return ((rParl * rParl) + (rPerp * rPerp)) / 2;
+}
+
+vec3 Shade(Ray r, int depth) {
+    Sun sun;
+    sun.color = vec3(1.0, 1.0, 1.0);
+    sun.dir = normalize(vec3(-0.5, -1.0, 0.4));
+    sun.intensity = 1;
+    sun.angle = 0.275;
+
+    vec3 skyColor = vec3(0.5, 0.5, 0.8);
+
+    vec3 color = vec3(0.0);
+    vec3 materialColor = vec3(1.0);
+
+    for (int i = 0; i < depth; i++) {
+        Triangle t;
+        int triangleId;
+        HitPoint hit = BVHHit(r, t, triangleId);
+        if (hit.hit) {
+            vec3 hitColor = material.material[t.materialIndex].color;
+
+            color += materialColor * material.material[t.materialIndex].emissionColor * material.material[t.materialIndex].emissionIntensity;
+            materialColor *= hitColor;
+            hit.normal = -InterpolateAttribute(hit, t.normals);
+
+            // Apply sun shadows
+            Ray shadowRay;
+            shadowRay.direction = -sun.dir;
+            vec2 u = vec2(rand(), rand());
+            vec2 randomPoint = UniformRandomCirclePoint(tan(sun.angle/180*PI), u);
+            mat3 tbn = Tbn(shadowRay.direction);
+            shadowRay.direction = tbn * normalize(vec3(randomPoint.x, randomPoint.y, 1));
+            shadowRay.origin = hit.point + (shadowRay.direction * 0.001);
+            HitPoint shadowHit;
+            Triangle tShadow;
+            int tShadowId;
+            shadowHit = BVHHit(shadowRay, tShadow, tShadowId);
+            if (!shadowHit.hit || tShadowId == triangleId) {
+                float d = dot(sun.dir, hit.normal) * sun.intensity;
+                if (d < 0)
+                d = 0;
+                color += sun.color * d * materialColor;
+            }
+
+            // Diffuse global illumination
+            Ray diffuseRay;
+            diffuseRay.direction = cosWeightedRandomHemisphereDirection(-hit.normal);
+            diffuseRay.origin = hit.point + (diffuseRay.direction * 0.001);
+            r = diffuseRay;
+        }
+        else {
+            color += skyColor * materialColor;
+            break;
+        }
+    }
+    return color;
+}
+
 void main() {
     uvec2 pos = gl_GlobalInvocationID.xy;
     if (pos.x > pc.width || pos.y > pc.height) {
         return;
     }
-
+    seed = vec2(pos);
     Ray r;
     r.origin = pc.cameraPos;
     r.direction.x = float(pos.x) / float(pc.width) - 0.5;
@@ -178,6 +344,10 @@ void main() {
 
     Triangle t;
 
-    HitPoint hit = BVHHit(r, t);
-    o.a[pos.x + pos.y * pc.width] = hit.barycentric;
+    vec3 color = Shade(r, 3);
+
+    float exposure = 1.5;
+    color = 1 - exp(-color * exposure);
+
+    o.a[pos.x + pos.y * pc.width] = color;
 }

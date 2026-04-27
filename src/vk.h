@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <vulkan/vulkan.h>
 #include <assert.h>
+#include "MeowMath.h"
 #define error(a) ({printf(a); abort();})
 
 static VkInstance instance;
@@ -18,6 +19,7 @@ static VkPipeline pipeline;
 static VkDescriptorSet descriptorSet;
 static VkPipelineLayout pipelineLayout;
 static struct Vec3 *frameBuffer;
+static struct MaterialGpu *gpuMaterials;
 
 static uint32_t shaderCode[] = {
 #include "../shaders/compiled/raytracer.comp.spv.h"
@@ -302,7 +304,7 @@ static VkResult CreatePipeline() {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
       .flags = 0,
       .pNext = NULL,
-      .bindingCount = 2,
+      .bindingCount = 3,
       .pBindings = (VkDescriptorSetLayoutBinding[]) {
          {
             .binding = 0,
@@ -313,6 +315,13 @@ static VkResult CreatePipeline() {
          },
          {
             .binding = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL
+         },
+         {
+            .binding = 2,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -372,7 +381,7 @@ static VkResult CreateDescriptorSet(VkBuffer buffer) {
       .maxSets = 1,
       .poolSizeCount = 1,
       .pNext = NULL,
-      .pPoolSizes = (const VkDescriptorPoolSize[]) {{.descriptorCount = 2, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}}
+      .pPoolSizes = (const VkDescriptorPoolSize[]) {{.descriptorCount = 3, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}}
    }, NULL, &descriptorPool);
    if (res != VK_SUCCESS)
       return -1;
@@ -488,6 +497,48 @@ static VkResult UpdateBvhBuffer(VkBuffer buffer) {
       .pImageInfo = NULL,
       .pTexelBufferView = NULL,
    }, 0, NULL);
+}
+
+VkResult UploadMaterials(struct Material *materials, int materialCount) {
+   VkResult res;
+   VkBuffer buffer;
+   res = CreateBuffer(sizeof(struct MaterialGpu) * materialCount, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &buffer, (void**)&gpuMaterials ,true);
+   if (res != VK_SUCCESS)
+      return -1;
+
+   for (int i = 0; i < materialCount; i++) {
+      gpuMaterials[i].color = materials[i].color;
+      gpuMaterials[i].emissionColor = materials[i].emissionColor;
+      gpuMaterials[i].emissionIntensity = materials[i].emissionIntensity;
+      gpuMaterials[i].enableNormalMap = materials[i].enableNormalMap;
+      gpuMaterials[i].enableRoughnessMap = materials[i].enableRoughnessMap;
+      gpuMaterials[i].enableTexture = materials[i].enableTexture;
+      gpuMaterials[i].ior = materials[i].ior;
+      gpuMaterials[i].metallic = materials[i].metallic;
+      gpuMaterials[i].normalMap = -1;
+      gpuMaterials[i].roughness = materials[i].roughness;
+      gpuMaterials[i].roughnessMap = -1;
+      gpuMaterials[i].texture = -1;
+      gpuMaterials[i].transmissive = materials[i].transmissive;
+   }
+
+   vkUpdateDescriptorSets(device, 1, &(const VkWriteDescriptorSet) {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptorSet,
+      .dstBinding = 2,
+      .dstArrayElement = 0,
+      .pNext = NULL,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pBufferInfo = &(VkDescriptorBufferInfo) {
+         .buffer = buffer,
+         .offset = 0,
+         .range = VK_WHOLE_SIZE,
+      },
+      .pImageInfo = NULL,
+      .pTexelBufferView = NULL,
+   }, 0, NULL);
+   return res;
 }
 
 int CreateVk(int width, int height) {

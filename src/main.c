@@ -61,7 +61,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     last_time = SDL_GetTicks();
 
 
-    scene.mesh = ImportObj("../Objs/Camera.obj");
+    scene.mesh = ImportObj("../Objs/Test.obj");
     scene.bvhRoot = BuildBVH(scene.mesh.triangles, scene.mesh.triangleCount);
 
     scene.sun = (struct Sun){.dir={0, -1, 0}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};
@@ -92,6 +92,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     CreateVk(s.width, s.height);
     struct LinearBVH linearBVH = LinearizeBVH(scene.bvhRoot);
     UpdateBvhBuffer(linearBVH.buffer);
+    UploadMaterials(scene.mesh.material, scene.mesh.materialCount);
 
     return SDL_APP_CONTINUE;
 }
@@ -399,7 +400,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     if (dt > 100.0f)
         dt = 100.0f;
     last_time = t;
-    float speed = 3.0f;
+    float speed = 6.0f;
 
     if (!inputStates.menu) {
         struct Vec3 posDelta = {0};
