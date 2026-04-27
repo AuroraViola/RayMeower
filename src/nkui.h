@@ -225,7 +225,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         scene->mesh.materialGpu[settings->selectedMaterial].ior = nk_propertyf(ctx, "IOR", 1.0f, scene->mesh.materialGpu[settings->selectedMaterial].ior, 10.0f, 0.01f,0.005f);
         nk_layout_row_dynamic(ctx, 25, 2);
         nk_label(ctx, "Emission Color", NK_TEXT_LEFT);
-        struct nk_colorf emissionColor = {scene->mesh.material[settings->selectedMaterial].emissionColor.x, scene->mesh.material[settings->selectedMaterial].emissionColor.y, scene->mesh.material[settings->selectedMaterial].emissionColor.z, 1.0f};
+        struct nk_colorf emissionColor = {scene->mesh.materialGpu[settings->selectedMaterial].emissionColor.x, scene->mesh.materialGpu[settings->selectedMaterial].emissionColor.y, scene->mesh.materialGpu[settings->selectedMaterial].emissionColor.z, 1.0f};
         if (nk_combo_begin_color(ctx, nk_rgb_cf(emissionColor), nk_vec2(nk_widget_width(ctx)*2,400))) {
             nk_layout_row_dynamic(ctx, 120, 1);
             emissionColor = nk_color_picker(ctx, emissionColor, NK_RGBA);
@@ -235,12 +235,12 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
             emissionColor.b = nk_propertyf(ctx, "#B:", 0, emissionColor.b, 1.0f, 0.01f,0.005f);
             nk_combo_end(ctx);
         }
-        scene->mesh.material[settings->selectedMaterial].emissionColor.x = emissionColor.r;
-        scene->mesh.material[settings->selectedMaterial].emissionColor.y = emissionColor.g;
-        scene->mesh.material[settings->selectedMaterial].emissionColor.z = emissionColor.b;
+        scene->mesh.materialGpu[settings->selectedMaterial].emissionColor.x = emissionColor.r;
+        scene->mesh.materialGpu[settings->selectedMaterial].emissionColor.y = emissionColor.g;
+        scene->mesh.materialGpu[settings->selectedMaterial].emissionColor.z = emissionColor.b;
         nk_layout_row_dynamic(ctx, 25, 1);
-        scene->mesh.material[settings->selectedMaterial].emissionIntensity = nk_propertyf(ctx, "Emission intensity", 0.0f, scene->mesh.material[settings->selectedMaterial].emissionIntensity, 100.0f, 0.01f,0.01f);
-        scene->mesh.material[settings->selectedMaterial].transmissive = nk_propertyf(ctx, "Transmissive", 0.0f, scene->mesh.material[settings->selectedMaterial].transmissive, 1.0f, 0.01f,0.005f);
+        scene->mesh.materialGpu[settings->selectedMaterial].emissionIntensity = nk_propertyf(ctx, "Emission intensity", 0.0f, scene->mesh.materialGpu[settings->selectedMaterial].emissionIntensity, 100.0f, 0.01f,0.01f);
+        scene->mesh.materialGpu[settings->selectedMaterial].transmissive = nk_propertyf(ctx, "Transmissive", 0.0f, scene->mesh.materialGpu[settings->selectedMaterial].transmissive, 1.0f, 0.01f,0.005f);
         scene->mesh.material[settings->selectedMaterial].enableTexture = nk_check_label(ctx, "Diffuse map", scene->mesh.material[settings->selectedMaterial].enableTexture);
         scene->mesh.material[settings->selectedMaterial].enableRoughnessMap = nk_check_label(ctx, "Roughness map", scene->mesh.material[settings->selectedMaterial].enableRoughnessMap);
         scene->mesh.material[settings->selectedMaterial].enableNormalMap = nk_check_label(ctx, "Normal map", scene->mesh.material[settings->selectedMaterial].enableNormalMap);

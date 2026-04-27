@@ -398,6 +398,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     uint64_t t = SDL_GetTicks();
     float dt = (float)t - (float)last_time;
     dt /= 1000.0f;
+    printf("\rfps %f           ", 1/dt);
+    fflush(stdout);
     if (dt > 100.0f)
         dt = 100.0f;
     last_time = t;
@@ -423,7 +425,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_FRect fr = {0, 0, width, height};
     SDL_Rect r = {0, 0, width, height};
 
-    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_GetTicks());
+    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000));
     uint32_t *pixels;
     int pitch;
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);

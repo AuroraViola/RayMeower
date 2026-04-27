@@ -128,9 +128,6 @@ bool IntersectionAABB(Ray ray, AABB aabb) {
 
     return exit > 0.0 && exit > enter;
 }
-float Lerp(float a, float b, float fact) {
-    return a + fact * (b - a);
-}
 
 #define STACK_SIZE 32
     int stacks[STACK_SIZE];
@@ -181,7 +178,7 @@ HitPoint BVHHit(Ray ray, out Triangle t, out int node) {
     return hit;
 }
 
-vec2 seed;
+vec3 seed;
 
 float hash12(vec2 p) {
     vec3 p3  = fract(vec3(p.xyx) * .1031);
@@ -189,10 +186,16 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
+float hash13(vec3 p3) {
+    p3  = fract(p3 * .1031);
+    p3 += dot(p3, p3.zyx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
 float rand() {
     seed.x += 1.3;
     seed.y += 1.7;
-    return hash12(seed);
+    return hash13(seed);
 }
 
 layout(local_size_x=8, local_size_y=8, local_size_z=1) in;
@@ -280,6 +283,25 @@ vec3 Reflect(vec3 v, vec3 n) {
     return v - n * 2*dot(n, v);
 }
 
+vec3 Refract(vec3 direction, vec3 normal, float ior) {
+    direction = -direction;
+    float cosTheta = -dot(direction, normal);
+    normal = -normal;
+    if (cosTheta < 0) {
+        normal = -normal;
+        cosTheta = -cosTheta;
+        ior = 1/ior;
+    }
+    float sin2ThetaI = 1 - cosTheta * cosTheta;
+    float sin2ThetaT = sin2ThetaI / (ior * ior);
+    if (sin2ThetaT >= 1) {
+        // Total internal reflection handled in Fresnel
+        sin2ThetaT = 1;
+    }
+    float cosThetaT = sqrt(1 - sin2ThetaT);
+    return normalize((direction / -ior) + (normal * (cosTheta / ior - cosThetaT)));
+}
+
 float FresnelDielectric(float cosTheta, float ior) {
     if (cosTheta < 0) {
         cosTheta = -cosTheta;
@@ -319,6 +341,7 @@ vec3 Shade(Ray r, int depth) {
         if (hit.hit) {
             hit.normal = -InterpolateAttribute(hit, t.normals);
             float roughness = material.material[t.materialIndex].roughness;
+            vec3 hitColor = material.material[t.materialIndex].color;
 
             // Apply Reflections
             vec3 incidentVector = r.direction;
@@ -326,7 +349,7 @@ vec3 Shade(Ray r, int depth) {
             float rand2 = rand();
             float randTrans = rand();
 
-            float fresnel = Lerp(material.material[t.materialIndex].metallic, 1, FresnelDielectric(cosTheta, material.material[t.materialIndex].ior));
+            float fresnel = mix(material.material[t.materialIndex].metallic, 1, FresnelDielectric(cosTheta, material.material[t.materialIndex].ior));
             if (fresnel > rand()) {
                 mat3 tbn = Tbn(cosTheta < 0 ? -hit.normal : hit.normal);
                 vec3 tbnIncident = incidentVector * tbn;
@@ -341,16 +364,9 @@ vec3 Shade(Ray r, int depth) {
                 reflectionRay.direction = tbn * tbnReflected;
                 reflectionRay.origin = hit.point + reflectionRay.direction * 0.001;
                 r = reflectionRay;
-                /*
-                struct Vec3 refColor = Shade(reflectionRay, depth - 1);
-                color.x += refColor.x * Lerp(1, hitColor.x, scene.mesh.material[index].metallic);
-                color.y += refColor.y * Lerp(1, hitColor.y, scene.mesh.material[index].metallic);
-                color.z += refColor.z * Lerp(1, hitColor.z, scene.mesh.material[index].metallic);
-                */
+                materialColor *= mix(vec3(1), hitColor, material.material[t.materialIndex].metallic);
             }
-            else {
-                vec3 hitColor = material.material[t.materialIndex].color;
-
+            else if (randTrans > material.material[t.materialIndex].transmissive) {
                 color += materialColor * material.material[t.materialIndex].emissionColor * material.material[t.materialIndex].emissionIntensity;
                 materialColor *= hitColor;
 
@@ -379,6 +395,23 @@ vec3 Shade(Ray r, int depth) {
                 diffuseRay.origin = hit.point + (diffuseRay.direction * 0.001);
                 r = diffuseRay;
             }
+            // Transmissive
+            else {
+                mat3 tbn = Tbn(cosTheta < 0 ? -hit.normal : hit.normal);
+                vec3 tbnIncident = incidentVector * tbn;
+                vec2 u;
+                u.x = rand();
+                u.y = rand();
+
+                vec3 tbnNormal = sampleGgxVndf(tbnIncident, vec2(roughness, roughness), u);
+                vec3 tbnRefracted = Refract(tbnIncident, cosTheta < 0 ? -tbnNormal : tbnNormal, material.material[t.materialIndex].ior);
+
+                Ray transRay;
+                transRay.direction = tbn * tbnRefracted;
+                transRay.origin = hit.point + transRay.direction* 0.001;
+                r = transRay;
+                materialColor *= hitColor;
+            }
         }
         else {
             if (-dot(r.direction, sun.dir) > cos(sun.angle / 180 * PI)) {
@@ -396,7 +429,7 @@ void main() {
     if (pos.x > pc.width || pos.y > pc.height) {
         return;
     }
-    seed = vec2(pos.x + pc.time, pos.y + pc.time);
+    seed = vec3(pos.x, pos.y, pc.time);
     Ray r;
     r.origin = pc.cameraPos;
     r.direction.x = float(pos.x) / float(pc.width) - 0.5;
