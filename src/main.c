@@ -93,6 +93,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     struct LinearBVH linearBVH = LinearizeBVH(scene.bvhRoot);
     UpdateBvhBuffer(linearBVH.buffer);
     UploadMaterials(scene.mesh.material, scene.mesh.materialCount);
+    scene.mesh.materialGpu = gpuMaterials;
 
     return SDL_APP_CONTINUE;
 }
@@ -422,7 +423,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_FRect fr = {0, 0, width, height};
     SDL_Rect r = {0, 0, width, height};
 
-    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0));
+    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_GetTicks());
     uint32_t *pixels;
     int pitch;
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);

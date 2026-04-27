@@ -111,6 +111,7 @@ struct Mesh {
     struct Triangle *triangles;
     int triangleCount;
     struct Material *material;
+    struct MaterialGpu *materialGpu;
     int materialCount;
 };
 

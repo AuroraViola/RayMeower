@@ -128,6 +128,9 @@ bool IntersectionAABB(Ray ray, AABB aabb) {
 
     return exit > 0.0 && exit > enter;
 }
+float Lerp(float a, float b, float fact) {
+    return a + fact * (b - a);
+}
 
 #define STACK_SIZE 32
     int stacks[STACK_SIZE];
@@ -203,6 +206,7 @@ layout(push_constant, scalar) uniform Pc{
     int height;
     vec3 cameraPos;
     mat3 rotmat;
+    uint time;
 } pc;
 
 mat3 Tbn(vec3 n) {
@@ -252,6 +256,30 @@ vec3 InterpolateAttribute(HitPoint hit, mat3 v) {
     return v[0] + v[1] +v[2];
 }
 
+vec3 sampleGgxVndf(vec3 ve, vec2 alpha, vec2 U) {
+    vec3 Vh = normalize(vec3(alpha.x * ve.x, alpha.y * ve.y, ve.z));
+    float lensq = length(vec3(Vh.x, Vh.y, 0));
+
+    vec3 T1 = lensq > 0.0 ? vec3(-Vh.y, Vh.x, 0.0) * (1/sqrt(lensq)) : vec3(1.0, 0.0, 0.0);
+    vec3 T2 = cross(Vh, T1);
+
+    float r = sqrt(U.x);
+    float phi = 2.0 * PI * U.y;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+
+    vec3 Nh = T1 * t1 + T2 * t2 + Vh * sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2));
+
+    vec3 Ne = normalize(vec3(alpha.x * Nh.x, alpha.y * Nh.y, max(0.0, Nh.z)));
+    return Ne;
+}
+
+vec3 Reflect(vec3 v, vec3 n) {
+    return v - n * 2*dot(n, v);
+}
+
 float FresnelDielectric(float cosTheta, float ior) {
     if (cosTheta < 0) {
         cosTheta = -cosTheta;
@@ -287,39 +315,75 @@ vec3 Shade(Ray r, int depth) {
         Triangle t;
         int triangleId;
         HitPoint hit = BVHHit(r, t, triangleId);
+
         if (hit.hit) {
-            vec3 hitColor = material.material[t.materialIndex].color;
-
-            color += materialColor * material.material[t.materialIndex].emissionColor * material.material[t.materialIndex].emissionIntensity;
-            materialColor *= hitColor;
             hit.normal = -InterpolateAttribute(hit, t.normals);
+            float roughness = material.material[t.materialIndex].roughness;
 
-            // Apply sun shadows
-            Ray shadowRay;
-            shadowRay.direction = -sun.dir;
-            vec2 u = vec2(rand(), rand());
-            vec2 randomPoint = UniformRandomCirclePoint(tan(sun.angle/180*PI), u);
-            mat3 tbn = Tbn(shadowRay.direction);
-            shadowRay.direction = tbn * normalize(vec3(randomPoint.x, randomPoint.y, 1));
-            shadowRay.origin = hit.point + (shadowRay.direction * 0.001);
-            HitPoint shadowHit;
-            Triangle tShadow;
-            int tShadowId;
-            shadowHit = BVHHit(shadowRay, tShadow, tShadowId);
-            if (!shadowHit.hit || tShadowId == triangleId) {
-                float d = dot(sun.dir, hit.normal) * sun.intensity;
-                if (d < 0)
-                d = 0;
-                color += sun.color * d * materialColor;
+            // Apply Reflections
+            vec3 incidentVector = r.direction;
+            float cosTheta = dot(incidentVector, hit.normal);
+            float rand2 = rand();
+            float randTrans = rand();
+
+            float fresnel = Lerp(material.material[t.materialIndex].metallic, 1, FresnelDielectric(cosTheta, material.material[t.materialIndex].ior));
+            if (fresnel > rand()) {
+                mat3 tbn = Tbn(cosTheta < 0 ? -hit.normal : hit.normal);
+                vec3 tbnIncident = incidentVector * tbn;
+                vec2 u;
+                u.x = rand();
+                u.y = rand();
+
+                vec3 tbnNormal = sampleGgxVndf(tbnIncident, vec2(roughness, roughness), u);
+                vec3 tbnReflected = Reflect(tbnIncident, tbnNormal);
+
+                Ray reflectionRay;
+                reflectionRay.direction = tbn * tbnReflected;
+                reflectionRay.origin = hit.point + reflectionRay.direction * 0.001;
+                r = reflectionRay;
+                /*
+                struct Vec3 refColor = Shade(reflectionRay, depth - 1);
+                color.x += refColor.x * Lerp(1, hitColor.x, scene.mesh.material[index].metallic);
+                color.y += refColor.y * Lerp(1, hitColor.y, scene.mesh.material[index].metallic);
+                color.z += refColor.z * Lerp(1, hitColor.z, scene.mesh.material[index].metallic);
+                */
             }
+            else {
+                vec3 hitColor = material.material[t.materialIndex].color;
 
-            // Diffuse global illumination
-            Ray diffuseRay;
-            diffuseRay.direction = cosWeightedRandomHemisphereDirection(-hit.normal);
-            diffuseRay.origin = hit.point + (diffuseRay.direction * 0.001);
-            r = diffuseRay;
+                color += materialColor * material.material[t.materialIndex].emissionColor * material.material[t.materialIndex].emissionIntensity;
+                materialColor *= hitColor;
+
+                // Apply sun shadows
+                Ray shadowRay;
+                shadowRay.direction = -sun.dir;
+                vec2 u = vec2(rand(), rand());
+                vec2 randomPoint = UniformRandomCirclePoint(tan(sun.angle/180*PI), u);
+                mat3 tbn = Tbn(shadowRay.direction);
+                shadowRay.direction = tbn * normalize(vec3(randomPoint.x, randomPoint.y, 1));
+                shadowRay.origin = hit.point + (shadowRay.direction * 0.001);
+                HitPoint shadowHit;
+                Triangle tShadow;
+                int tShadowId;
+                shadowHit = BVHHit(shadowRay, tShadow, tShadowId);
+                if (!shadowHit.hit || tShadowId == triangleId) {
+                    float d = dot(sun.dir, hit.normal) * sun.intensity;
+                    if (d < 0)
+                    d = 0;
+                    color += sun.color * d * materialColor;
+                }
+
+                // Diffuse global illumination
+                Ray diffuseRay;
+                diffuseRay.direction = cosWeightedRandomHemisphereDirection(-hit.normal);
+                diffuseRay.origin = hit.point + (diffuseRay.direction * 0.001);
+                r = diffuseRay;
+            }
         }
         else {
+            if (-dot(r.direction, sun.dir) > cos(sun.angle / 180 * PI)) {
+                color += sun.color * sun.intensity * materialColor;
+            }
             color += skyColor * materialColor;
             break;
         }
@@ -332,7 +396,7 @@ void main() {
     if (pos.x > pc.width || pos.y > pc.height) {
         return;
     }
-    seed = vec2(pos);
+    seed = vec2(pos.x + pc.time, pos.y + pc.time);
     Ray r;
     r.origin = pc.cameraPos;
     r.direction.x = float(pos.x) / float(pc.width) - 0.5;
@@ -344,7 +408,7 @@ void main() {
 
     Triangle t;
 
-    vec3 color = Shade(r, 3);
+    vec3 color = Shade(r, 4);
 
     float exposure = 1.5;
     color = 1 - exp(-color * exposure);

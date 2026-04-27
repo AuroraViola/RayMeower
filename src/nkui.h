@@ -205,7 +205,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         settings->selectedMaterial = nk_combo_string(ctx, materialNames, settings->selectedMaterial, scene->mesh.materialCount, 25, (struct nk_vec2){nk_widget_width(ctx), 400});
 
         nk_label(ctx, "Material Color", NK_TEXT_LEFT);
-        struct nk_colorf materialColor = {scene->mesh.material[settings->selectedMaterial].color.x, scene->mesh.material[settings->selectedMaterial].color.y, scene->mesh.material[settings->selectedMaterial].color.z, 1.0f};
+        struct nk_colorf materialColor = {scene->mesh.materialGpu[settings->selectedMaterial].color.x, scene->mesh.materialGpu[settings->selectedMaterial].color.y, scene->mesh.materialGpu[settings->selectedMaterial].color.z, 1.0f};
         if (nk_combo_begin_color(ctx, nk_rgb_cf(materialColor), nk_vec2(nk_widget_width(ctx)*2,400))) {
             nk_layout_row_dynamic(ctx, 120, 1);
             materialColor = nk_color_picker(ctx, materialColor, NK_RGBA);
@@ -215,14 +215,14 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
             materialColor.b = nk_propertyf(ctx, "#B:", 0, materialColor.b, 1.0f, 0.01f,0.005f);
             nk_combo_end(ctx);
         }
-        scene->mesh.material[settings->selectedMaterial].color.x = materialColor.r;
-        scene->mesh.material[settings->selectedMaterial].color.y = materialColor.g;
-        scene->mesh.material[settings->selectedMaterial].color.z = materialColor.b;
+        scene->mesh.materialGpu[settings->selectedMaterial].color.x = materialColor.r;
+        scene->mesh.materialGpu[settings->selectedMaterial].color.y = materialColor.g;
+        scene->mesh.materialGpu[settings->selectedMaterial].color.z = materialColor.b;
 
         nk_layout_row_dynamic(ctx, 25, 1);
-        scene->mesh.material[settings->selectedMaterial].roughness = nk_propertyf(ctx, "Roughness", 0, scene->mesh.material[settings->selectedMaterial].roughness, 1.0f, 0.01f,0.005f);
-        scene->mesh.material[settings->selectedMaterial].metallic = nk_propertyf(ctx, "Metallic", 0, scene->mesh.material[settings->selectedMaterial].metallic, 1.0f, 0.01f,0.005f);
-        scene->mesh.material[settings->selectedMaterial].ior = nk_propertyf(ctx, "IOR", 1.0f, scene->mesh.material[settings->selectedMaterial].ior, 10.0f, 0.01f,0.005f);
+        scene->mesh.materialGpu[settings->selectedMaterial].roughness = nk_propertyf(ctx, "Roughness", 0, scene->mesh.materialGpu[settings->selectedMaterial].roughness, 1.0f, 0.01f,0.005f);
+        scene->mesh.materialGpu[settings->selectedMaterial].metallic = nk_propertyf(ctx, "Metallic", 0, scene->mesh.materialGpu[settings->selectedMaterial].metallic, 1.0f, 0.01f,0.005f);
+        scene->mesh.materialGpu[settings->selectedMaterial].ior = nk_propertyf(ctx, "IOR", 1.0f, scene->mesh.materialGpu[settings->selectedMaterial].ior, 10.0f, 0.01f,0.005f);
         nk_layout_row_dynamic(ctx, 25, 2);
         nk_label(ctx, "Emission Color", NK_TEXT_LEFT);
         struct nk_colorf emissionColor = {scene->mesh.material[settings->selectedMaterial].emissionColor.x, scene->mesh.material[settings->selectedMaterial].emissionColor.y, scene->mesh.material[settings->selectedMaterial].emissionColor.z, 1.0f};
