@@ -27,6 +27,17 @@ layout(scalar) struct Triangle {
     int materialIndex;
 };
 
+layout(scalar) struct BvhNode {
+    int left;
+    int right;
+    Triangle triangle;
+    AABB aabb;
+};
+
+layout(scalar, set=0, binding=1) buffer Bvh {
+    BvhNode node[];
+} bvh;
+
 HitPoint TriangleIntersection(Ray ray, Triangle triangle) {
     HitPoint hit;
     hit.hit = false;
@@ -89,31 +100,84 @@ bool IntersectionAABB(Ray ray, AABB aabb) {
     return exit > 0.0 && exit > enter;
 }
 
-layout(local_size_x=16, local_size_y=16, local_size_z=1) in;
+#define STACK_SIZE 32
+    int stacks[STACK_SIZE];
+
+#define stack_init() \
+    uint stack_p = 0
+
+#define stack_push(v) \
+    stacks[stack_p++] = v
+
+#define stack_pop() \
+    (stacks[--stack_p])
+
+#define stack_len() \
+    (stack_p)
+
+HitPoint BVHHit(Ray ray, out Triangle t) {
+    HitPoint hit;
+    hit.hit = false;
+    hit.barycentric = vec3(0);
+    stack_init();
+
+    // push root to stack
+    stack_push(0);
+
+    while (stack_len() > 0 && stack_len() < STACK_SIZE) {
+        int currentNode = stack_pop();
+        if (bvh.node[currentNode].left == -1 && bvh.node[currentNode].right == -1) {
+            HitPoint currentHit = TriangleIntersection(ray, bvh.node[currentNode].triangle);
+            if (hit.hit == false || hit.distance > currentHit.distance) {
+                hit = currentHit;
+                t = bvh.node[currentNode].triangle;
+            }
+        }
+        else {
+            bool intersect = IntersectionAABB(ray, bvh.node[currentNode].aabb);
+            if (intersect) {
+                if (bvh.node[currentNode].left != -1) {
+                    stack_push(bvh.node[currentNode].left);
+                }
+                if (bvh.node[currentNode].right != -1) {
+                    stack_push(bvh.node[currentNode].right);
+                }
+            }
+        }
+    }
+    return hit;
+}
+
+layout(local_size_x=8, local_size_y=8, local_size_z=1) in;
 
 layout(scalar, set=0, binding=0) buffer O {
     vec3 a[];
 } o;
 
-layout(push_constant) uniform Pc{
+layout(push_constant, scalar) uniform Pc{
     int width;
     int height;
+    vec3 cameraPos;
+    mat3 rotmat;
 } pc;
 
 void main() {
     uvec2 pos = gl_GlobalInvocationID.xy;
+    if (pos.x > pc.width || pos.y > pc.height) {
+        return;
+    }
 
     Ray r;
-    r.origin = vec3(0, 0, 0);
+    r.origin = pc.cameraPos;
     r.direction.x = float(pos.x) / float(pc.width) - 0.5;
     r.direction.y = float(pos.y) / float(pc.height) - 0.5;
     r.direction.y *= -float(pc.height)/float(pc.width);
     r.direction.z = 0.5;
     r.direction = normalize(r.direction);
+    r.direction = r.direction * pc.rotmat;
+
     Triangle t;
-    t.vertices[0] = vec3(-30, 0, 50);
-    t.vertices[1] = vec3(30, 0, 50);
-    t.vertices[2] = vec3(0, 40, 50);
-    HitPoint hit = TriangleIntersection(r, t);
+
+    HitPoint hit = BVHHit(r, t);
     o.a[pos.x + pos.y * pc.width] = hit.barycentric;
 }

@@ -26,6 +26,8 @@ static uint32_t shaderCode[] = {
 struct PushConstants {
    int width;
    int height;
+   struct Vec3 cameraPos;
+   struct Mat3 rotmat;
 };
 
 static void InitVk() {
@@ -237,7 +239,7 @@ CreateImageView(VkImage image,
    return 0;
 }
 
-static int CreateBuffer(int size, VkBufferUsageFlags usage, VkBuffer *buffer, void **pp) {
+static int CreateBuffer(int size, VkBufferUsageFlags usage, VkBuffer *buffer, void **pp, bool deviceLocal) {
    VkResult res = vkCreateBuffer(device,
       &(VkBufferCreateInfo) {
          .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -251,7 +253,14 @@ static int CreateBuffer(int size, VkBufferUsageFlags usage, VkBuffer *buffer, vo
 
    VkMemoryRequirements mem_reqs;
    vkGetBufferMemoryRequirements(device, *buffer, &mem_reqs);
-   int memoryIndex = find_memory_type(&mem_reqs, VK_MEMORY_PROPERTY_HOST_CACHED_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   VkMemoryPropertyFlags memFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+   if (deviceLocal) {
+      memFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+   }
+   else {
+      memFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+   }
+   int memoryIndex = find_memory_type(&mem_reqs, memFlags);
    if (memoryIndex == -1)
       return -1;
 
@@ -293,10 +302,17 @@ static VkResult CreatePipeline() {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
       .flags = 0,
       .pNext = NULL,
-      .bindingCount = 1,
+      .bindingCount = 2,
       .pBindings = (VkDescriptorSetLayoutBinding[]) {
          {
             .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL
+         },
+         {
+            .binding = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -356,7 +372,7 @@ static VkResult CreateDescriptorSet(VkBuffer buffer) {
       .maxSets = 1,
       .poolSizeCount = 1,
       .pNext = NULL,
-      .pPoolSizes = (const VkDescriptorPoolSize[]) {{.descriptorCount = 1, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}}
+      .pPoolSizes = (const VkDescriptorPoolSize[]) {{.descriptorCount = 2, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}}
    }, NULL, &descriptorPool);
    if (res != VK_SUCCESS)
       return -1;
@@ -391,7 +407,7 @@ static VkResult CreateDescriptorSet(VkBuffer buffer) {
    return res;
 }
 
-static VkResult AllocateCommandBuffer(VkCommandBuffer *cmdBuffer, int width, int height) {
+static VkResult AllocateCommandBuffer(VkCommandBuffer *cmdBuffer, int width, int height, struct Vec3 cameraPos, struct Mat3 rotMat) {
    VkResult res;
    res = vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo) {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -413,10 +429,10 @@ static VkResult AllocateCommandBuffer(VkCommandBuffer *cmdBuffer, int width, int
    vkCmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
    vkCmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-   struct PushConstants pc = {width, height};
+   struct PushConstants pc = {width, height, cameraPos, rotMat};
    vkCmdPushConstants(*cmdBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
-   vkCmdDispatch(*cmdBuffer, width/16, height/16, 1);
+   vkCmdDispatch(*cmdBuffer, width/8, height/8, 1);
 
    vkEndCommandBuffer(*cmdBuffer);
 
@@ -455,21 +471,40 @@ static VkResult SubmitCommandBuffer(VkCommandBuffer cmdBuffer) {
    return res;
 }
 
+static VkResult UpdateBvhBuffer(VkBuffer buffer) {
+   vkUpdateDescriptorSets(device, 1, &(const VkWriteDescriptorSet) {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptorSet,
+      .dstBinding = 1,
+      .dstArrayElement = 0,
+      .pNext = NULL,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pBufferInfo = &(VkDescriptorBufferInfo) {
+         .buffer = buffer,
+         .offset = 0,
+         .range = VK_WHOLE_SIZE,
+      },
+      .pImageInfo = NULL,
+      .pTexelBufferView = NULL,
+   }, 0, NULL);
+}
+
 int CreateVk(int width, int height) {
    InitVk();
    //VkImage image;
    //create_image(VK_FORMAT_R8G8B8A8_SRGB, (VkExtent3D) {256, 256, 1}, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT, &image);
 
    VkBuffer buffer;
-   CreateBuffer(width * height * sizeof(struct Vec3), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &buffer, (void**)&frameBuffer);
+   CreateBuffer(width * height * sizeof(struct Vec3), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &buffer, (void**)&frameBuffer, false);
    CreatePipeline();
    CreateDescriptorSet(buffer);
    return 0;
 }
 
-int RunVk(int width, int height) {
+int RunVk(int width, int height, struct Vec3 cameraPos, struct Mat3 rotMat) {
    VkCommandBuffer commandBuffer;
-   AllocateCommandBuffer(&commandBuffer, width, height);
+   AllocateCommandBuffer(&commandBuffer, width, height, cameraPos, rotMat);
 
    SubmitCommandBuffer(commandBuffer);
    return 0;

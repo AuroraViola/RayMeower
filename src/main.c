@@ -40,6 +40,7 @@ struct InputStates inputStates = {0};
 static int SDLCALL RenderThread(void *ptr);
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
+
     SDL_SetAppMetadata("RayMeower", "0.0.1", "io.auroraviola.raymeower");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -60,7 +61,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     last_time = SDL_GetTicks();
 
 
-    scene.mesh = ImportObj("../Objs/Test.obj");
+    scene.mesh = ImportObj("../Objs/Camera.obj");
     scene.bvhRoot = BuildBVH(scene.mesh.triangles, scene.mesh.triangleCount);
 
     scene.sun = (struct Sun){.dir={0, -1, 0}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};
@@ -76,8 +77,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     s.renderSamples = 512;
     s.renderDepth = 4;
     s.skyColor = Vec3(0.5, 0.5, 0.8);
-    s.width = 160;
-    s.height = 144;
+    s.width = 1440;
+    s.height = 1080;
     s.renderWidth = 1440;
     s.renderHeight = 1080;
     s.renderMode = false;
@@ -89,6 +90,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     //SDL_Thread *renderThread = SDL_CreateThread(RenderThread, "RenderThread", NULL);
     CreateVk(s.width, s.height);
+    struct LinearBVH linearBVH = LinearizeBVH(scene.bvhRoot);
+    UpdateBvhBuffer(linearBVH.buffer);
 
     return SDL_APP_CONTINUE;
 }
@@ -418,7 +421,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_FRect fr = {0, 0, width, height};
     SDL_Rect r = {0, 0, width, height};
 
-    RunVk(s.width, s.height);
+    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0));
     uint32_t *pixels;
     int pitch;
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);

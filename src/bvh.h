@@ -4,7 +4,10 @@
 #include <stdlib.h>
 
 #include "MeowMath.h"
+#include "vulkan/vulkan.h"
 #include <assert.h>
+
+static int CreateBuffer(int size, VkBufferUsageFlags usage, VkBuffer *buffer, void **pp, bool deviceLocal);
 
 struct BVHNode {
     struct BVHNode *left;
@@ -13,6 +16,19 @@ struct BVHNode {
         struct Triangle triangle;
         struct AABB aabb;
     };
+};
+
+struct BVHNodeLinear {
+    int left;
+    int right;
+    struct Triangle triangle;
+    struct AABB aabb;
+};
+
+struct LinearBVH {
+    struct BVHNodeLinear *nodes;
+    VkBuffer buffer;
+    int size;
 };
 
 static inline bool CompareBarycenter(struct Triangle triangle, float midpoint, int axis) {
@@ -87,6 +103,49 @@ static inline struct BVHNode *BuildBVH_rec(struct Triangle *triangles, int start
 
 static inline struct BVHNode *BuildBVH(struct Triangle *triangles, int count) {
     return BuildBVH_rec(triangles, 0, count, 0);
+}
+
+static inline int explore(struct BVHNode *node) {
+    int nodes = 0;
+    if (node->left != NULL) {
+        nodes += explore(node->left);
+    }
+    if (node->right != NULL) {
+        nodes += explore(node->right);
+    }
+    return nodes + 1;
+}
+
+static inline void LinearizeBVH_rec(struct BVHNode *root, struct BVHNodeLinear *bvh, int *index) {
+    if (root->left == NULL && root->right == NULL) {
+        bvh[*index].triangle = root->triangle;
+    }
+    else {
+        bvh[*index].aabb = root->aabb;
+    }
+    int current_index = *index;
+    bvh[current_index].left = -1;
+    bvh[current_index].right = -1;
+    if (root->left != NULL) {
+        *index = (*index) + 1;
+        bvh[current_index].left = *index;
+        LinearizeBVH_rec(root->left, bvh, index);
+    }
+    if (root->right != NULL) {
+        *index = (*index) + 1;
+        bvh[current_index].right = *index;
+        LinearizeBVH_rec(root->right, bvh, index);
+    }
+}
+
+static inline struct LinearBVH LinearizeBVH(struct BVHNode *root) {
+    struct LinearBVH bvh;
+    bvh.size = explore(root);
+    //bvh.nodes = malloc(sizeof(struct BVHNodeLinear)* bvh.size);
+    CreateBuffer(bvh.size * sizeof(struct BVHNodeLinear), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &bvh.buffer, (void**)&bvh.nodes, true);
+    int index = 0;
+    LinearizeBVH_rec(root, bvh.nodes, &index);
+    return bvh;
 }
 
 #endif //RAYMEOWER_BVH_H
