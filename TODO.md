@@ -24,7 +24,30 @@
   - temporal accumulation
   - motion vectors
 - Depth of field
-- GPU rendering
-  - pls don't let me do this
-  - idk
-  - I don't want
+- GPU Rendering
+  - ~~Triangle intersection~~
+  - ~~Sun~~
+    - ~~Shadows~~
+    - ~~Contributions~~
+  - Point lights
+  - ~~Global illumination~~
+  - ~~Anti aliasing~~
+  - ~~Materials~~
+    - ~~Metallic~~
+    - ~~Dielectric~~
+    - ~~Transmissive~~
+    - ~~Diffuse map~~
+    - ~~Normal map~~
+    - Roughness map
+  - Material editor
+    - ~~Material color~~
+    - ~~Emission color~~
+    - ~~Roughness, metallic, transmissive and ior~~
+    - Texture enabler
+  - Scene settings
+    - Sky color
+    - Sun
+  - Rendering settings
+    - Samples and ~~depth~~
+    - Final render
+  - Render thread

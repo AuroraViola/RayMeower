@@ -215,6 +215,7 @@ layout(push_constant, scalar) uniform Pc{
     vec3 cameraPos;
     mat3 rotmat;
     uint time;
+    int depth;
 } pc;
 
 mat3 Tbn(vec3 n) {
@@ -491,8 +492,11 @@ void main() {
     seed = vec3(pos.x, pos.y, pc.time);
     Ray r;
     r.origin = pc.cameraPos;
-    r.direction.x = float(pos.x) / float(pc.width) - 0.5;
-    r.direction.y = float(pos.y) / float(pc.height) - 0.5;
+
+    vec2 rv2 = vec2(rand(), rand());
+
+    r.direction.x = float(pos.x + rv2.x) / float(pc.width) - 0.5;
+    r.direction.y = float(pos.y + rv2.y) / float(pc.height) - 0.5;
     r.direction.y *= -float(pc.height)/float(pc.width);
     r.direction.z = 0.5;
     r.direction = normalize(r.direction);
@@ -500,7 +504,7 @@ void main() {
 
     Triangle t;
 
-    vec3 color = Shade(r, 4);
+    vec3 color = Shade(r, pc.depth);
 
     float exposure = 1.5;
     color = 1 - exp(-color * exposure);

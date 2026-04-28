@@ -137,10 +137,10 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         nk_layout_row_dynamic(ctx, 25, 1);
 
         nk_label(ctx, "Viewport", NK_TEXT_CENTERED);
-        nk_property_int(ctx, "Resolution X:", 32, &settings->width, 640, 1, 1);
-        nk_property_int(ctx, "Resolution Y:", 32, &settings->height, 480, 1, 1);
-        nk_property_int(ctx, "Samples:", 1, &settings->samples, 64, 1, 1);
-        nk_property_int(ctx, "Depth:", 1, &settings->depth, 8, 1, 1);
+        nk_property_int(ctx, "Resolution X:", 32, &settings->width, 1920, 1, 1);
+        nk_property_int(ctx, "Resolution Y:", 32, &settings->height, 1080, 1, 1);
+        nk_property_int(ctx, "Samples:", 1, &settings->samples, 64, 1, 0.2);
+        nk_property_int(ctx, "Depth:", 1, &settings->depth, 8, 1, 0.2);
 
         nk_label(ctx, "Final render", NK_TEXT_CENTERED);
         if (nk_button_label(ctx, "Render Image")) {

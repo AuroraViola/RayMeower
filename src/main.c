@@ -19,6 +19,7 @@ struct Vec3 cameraPos = {0, 1, 0};
 
 static SDL_Texture *renderTexture = NULL;
 static uint32_t pixel[2][3840][2160];
+static struct Vec3 tempFrameBuffer[3840][2160] = {0};
 static int currentRender = 0;
 static SDL_Mutex *mutex;
 
@@ -73,12 +74,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     inputStates.menu = false;
     s.samples = 1;
-    s.depth = 2;
+    s.depth = 6;
     s.renderSamples = 512;
-    s.renderDepth = 4;
+    s.renderDepth = 16;
     s.skyColor = Vec3(0.5, 0.5, 0.8);
-    s.width = 1440;
-    s.height = 1080;
+    s.width = 1024;
+    s.height = 768;
     s.renderWidth = 1440;
     s.renderHeight = 1080;
     s.renderMode = false;
@@ -89,7 +90,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     mutex = SDL_CreateMutex();
 
     //SDL_Thread *renderThread = SDL_CreateThread(RenderThread, "RenderThread", NULL);
-    CreateVk(s.width, s.height);
+    CreateVk(3840, 2160);
     struct LinearBVH linearBVH = LinearizeBVH(scene.bvhRoot);
     UpdateBvhBuffer(linearBVH.buffer);
     UploadMaterials(scene.mesh.material, scene.mesh.materialCount);
@@ -418,14 +419,16 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     int height = s.height;
     int width = s.width;
+    int depth = s.depth;
     if (s.renderMode) {
         height = s.renderHeight;
         width = s.renderWidth;
+        depth = s.renderDepth;
     }
     SDL_FRect fr = {0, 0, width, height};
     SDL_Rect r = {0, 0, width, height};
 
-    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000));
+    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000), depth);
     uint32_t *pixels;
     int pitch;
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);
