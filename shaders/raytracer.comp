@@ -402,6 +402,16 @@ vec3 Shade(Ray r, int depth) {
                 mat3 normalTbn = TbnUv(hit.normal, t);
                 hit.normal = normalTbn * hitNormal;
             }
+            // Apply roughness texture
+            if (material.material[t.materialIndex].roughnessMap != -1 && material.material[t.materialIndex].enableRoughnessMap == 1) {
+                mat3 uvs;
+                uvs[0] = vec3(t.uv[0], 0);
+                uvs[1] = vec3(t.uv[1], 0);
+                uvs[2] = vec3(t.uv[2], 0);
+                vec2 uv = InterpolateAttribute(hit, uvs).xy;
+                uv.y = -uv.y;
+                roughness = texture(sampler2D(textures[nonuniformEXT(material.material[t.materialIndex].roughnessMap)], samplers[1]), uv).x;
+            }
 
             // Apply Reflections
             vec3 incidentVector = r.direction;

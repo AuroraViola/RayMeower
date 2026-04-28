@@ -38,7 +38,7 @@
     - ~~Transmissive~~
     - ~~Diffuse map~~
     - ~~Normal map~~
-    - Roughness map
+    - ~~Roughness map~~
   - ~~Material editor~~
     - ~~Material color~~
     - ~~Emission color~~

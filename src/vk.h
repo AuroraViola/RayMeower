@@ -592,15 +592,22 @@ int AddTexture(SDL_Surface *surface) {
    extent.height = surface->h;
    extent.depth = 1;
 
+   const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surface->format);
+   int pixelSize = details->bytes_per_pixel;
+   VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+   if (pixelSize == 1) {
+      format = VK_FORMAT_R8_UNORM;
+   }
+
    VkImage image;
-   CreateImage(VK_FORMAT_R8G8B8A8_UNORM, extent, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, &image);
+   CreateImage(format, extent, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, &image);
    VkMemoryRequirements reqs;
    vkGetImageMemoryRequirements(device, image, &reqs);
    VkDeviceMemory memory;
    ImageAllocate(image, reqs, find_memory_type(&reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), &memory);
 
    VkImageView view;
-   CreateImageView(image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, &view);
+   CreateImageView(image, format, VK_IMAGE_ASPECT_COLOR_BIT, &view);
    vkUpdateDescriptorSets(device, 1, &(const VkWriteDescriptorSet) {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
       .dstSet = descriptorSet,
@@ -621,8 +628,6 @@ int AddTexture(SDL_Surface *surface) {
    }, 0, NULL);
    lastTextureIndex++;
 
-   const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surface->format);
-   int pixelSize = details->bytes_per_pixel;
 
    VkBuffer buffer;
    void *texturedata;
@@ -741,7 +746,7 @@ VkResult UploadMaterials(struct Material *materials, int materialCount) {
       gpuMaterials[i].metallic = materials[i].metallic;
       gpuMaterials[i].normalMap = materials[i].normalMap != NULL ? AddTexture(materials[i].normalMap) : -1;
       gpuMaterials[i].roughness = materials[i].roughness;
-      gpuMaterials[i].roughnessMap = -1;
+      gpuMaterials[i].roughnessMap = materials[i].roughnessMap != NULL ? AddTexture(materials[i].roughnessMap) : -1;;
       gpuMaterials[i].texture = materials[i].texture != NULL ? AddTexture(materials[i].texture) : -1;
       gpuMaterials[i].transmissive = materials[i].transmissive;
    }
