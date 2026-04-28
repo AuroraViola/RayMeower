@@ -124,6 +124,7 @@ struct Scene {
     struct BVHNode *bvhRoot;
     struct Sun sun;
     struct PointLight *lights;
+    struct PointLights *lightsGpu;
     int lightsCount;
 };
 

@@ -90,6 +90,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     UploadMaterials(scene.mesh.material, scene.mesh.materialCount);
     scene.mesh.materialGpu = gpuMaterials;
     UploadPointLights(scene.lights, scene.lightsCount);
+    scene.lightsGpu = gpuPointLights;
 
     return SDL_APP_CONTINUE;
 }

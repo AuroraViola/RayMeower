@@ -76,6 +76,7 @@ struct Settings {
         struct nk_colorf skyColorNk;
     };
     int selectedMaterial;
+    int selectedPointLight;
 
     float cumFact;
     int cumSamples;
@@ -235,6 +236,57 @@ void NkMenuDraw(struct Settings *settings, struct Scene *scene) {
         scene->mesh.materialGpu[settings->selectedMaterial].enableTexture = nk_check_label(ctx, "Diffuse map", scene->mesh.materialGpu[settings->selectedMaterial].enableTexture);
         scene->mesh.materialGpu[settings->selectedMaterial].enableRoughnessMap = nk_check_label(ctx, "Roughness map", scene->mesh.materialGpu[settings->selectedMaterial].enableRoughnessMap);
         scene->mesh.materialGpu[settings->selectedMaterial].enableNormalMap = nk_check_label(ctx, "Normal map", scene->mesh.materialGpu[settings->selectedMaterial].enableNormalMap);
+    }
+    nk_end(ctx);
+
+    /* Point lights */
+    if (nk_begin(ctx, "Point lights", nk_rect(16, 397, 250, 275),
+        NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
+        NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
+    {
+        nk_layout_row_dynamic(ctx, 25, 2);
+        if (nk_button_label(ctx, "Add")) {
+            if (scene->lightsGpu->count < 128) {
+                scene->lightsGpu->count++;
+                settings->selectedPointLight = scene->lightsGpu->count - 1;
+            }
+        }
+        if (nk_button_label(ctx, "Remove")) {
+            if (scene->lightsGpu->count > 0) {
+                scene->lightsGpu->count--;
+                for (int i = settings->selectedPointLight; i < scene->lightsGpu->count; i++) {
+                    scene->lightsGpu->lights[i] = scene->lightsGpu->lights[i+1];
+                }
+                if (settings->selectedPointLight >= scene->lightsGpu->count) {
+                    settings->selectedPointLight = scene->lightsGpu->count - 1;
+                }
+            }
+        }
+
+        if (scene->lightsGpu->count > 0) {
+            nk_label(ctx, "Point Light:", NK_TEXT_LEFT);
+            settings->selectedPointLight = nk_combo_string(ctx, "L1\0L2\0L3\0L4\0L5\0L6\0L7\0L8\0L9\0L10\0L11\0", settings->selectedPointLight, scene->lightsGpu->count, 25, (struct nk_vec2){nk_widget_width(ctx), 400});
+
+            nk_label(ctx, "Color", NK_TEXT_LEFT);
+            struct nk_colorf lightColor = {scene->lightsGpu->lights[settings->selectedPointLight].color.x, scene->lightsGpu->lights[settings->selectedPointLight].color.y, scene->lightsGpu->lights[settings->selectedPointLight].color.z, 1.0f};
+            if (nk_combo_begin_color(ctx, nk_rgb_cf(lightColor), nk_vec2(nk_widget_width(ctx)*2,400))) {
+                nk_layout_row_dynamic(ctx, 120, 1);
+                lightColor = nk_color_picker(ctx, lightColor, NK_RGBA);
+                nk_layout_row_dynamic(ctx, 25, 1);
+                lightColor.r = nk_propertyf(ctx, "#R:", 0, lightColor.r, 1.0f, 0.01f,0.005f);
+                lightColor.g = nk_propertyf(ctx, "#G:", 0, lightColor.g, 1.0f, 0.01f,0.005f);
+                lightColor.b = nk_propertyf(ctx, "#B:", 0, lightColor.b, 1.0f, 0.01f,0.005f);
+                nk_combo_end(ctx);
+            }
+            scene->lightsGpu->lights[settings->selectedPointLight].color.x = lightColor.r;
+            scene->lightsGpu->lights[settings->selectedPointLight].color.y = lightColor.g;
+            scene->lightsGpu->lights[settings->selectedPointLight].color.z = lightColor.b;
+            nk_layout_row_dynamic(ctx, 25, 1);
+            nk_property_float(ctx, "Intensity", 0, &scene->lightsGpu->lights[settings->selectedPointLight].intensity, INFINITY, 0.01f,0.05f);
+            nk_property_float(ctx, "X:", -INFINITY, &scene->lightsGpu->lights[settings->selectedPointLight].pos.x, INFINITY, 0.01f,0.05f);
+            nk_property_float(ctx, "Y:", -INFINITY, &scene->lightsGpu->lights[settings->selectedPointLight].pos.y, INFINITY, 0.01f,0.05f);
+            nk_property_float(ctx, "Z:", -INFINITY, &scene->lightsGpu->lights[settings->selectedPointLight].pos.z, INFINITY, 0.01f,0.05f);
+        }
     }
     nk_end(ctx);
 }

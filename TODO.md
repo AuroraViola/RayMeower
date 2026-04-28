@@ -9,14 +9,15 @@
 - ~~Sun soft shadow~~
 - ~~Smooth shading~~
 - Tent filtering
-- Tone mapping
+- Tone mapping improvements
 - Gamma
 - BVH improvements
   - Collapsing levels
 - SAH
 - UI
   - Scene loading
-  - Point light editor
+  - ~~Point light editor~~
+  - Point light indicator
   - ~~Sun direction editor~~
 - Reducing noise effects
   - Blue noise
@@ -47,7 +48,7 @@
   - ~~Scene settings~~
     - ~~Sky color~~
     - ~~Sun~~
-  - Rendering settings
+  - ~~Rendering settings~~
     - ~~Samples and depth~~
-    - Final render
+    - ~~Final render~~
   - ~~Render thread~~
