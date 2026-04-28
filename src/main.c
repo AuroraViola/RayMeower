@@ -397,8 +397,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     uint64_t t = SDL_GetTicks();
     float dt = (float)t - (float)last_time;
+    printf("\rfps %f           ", 1000/dt);
     dt /= 1000.0f;
-    printf("\rfps %f           ", 1/dt);
     fflush(stdout);
     if (dt > 100.0f)
         dt = 100.0f;

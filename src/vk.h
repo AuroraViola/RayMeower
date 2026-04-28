@@ -20,6 +20,7 @@ static VkDescriptorSet descriptorSet;
 static VkPipelineLayout pipelineLayout;
 static struct Vec3 *frameBuffer;
 static struct MaterialGpu *gpuMaterials;
+static int lastTextureIndex = 0;
 
 static uint32_t shaderCode[] = {
 #include "../shaders/compiled/raytracer.comp.spv.h"
@@ -303,9 +304,9 @@ static VkResult CreatePipeline() {
 
    res = vkCreateDescriptorSetLayout(device, &(VkDescriptorSetLayoutCreateInfo) {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .flags = 0,
+      .flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT,
       .pNext = NULL,
-      .bindingCount = 3,
+      .bindingCount = 5,
       .pBindings = (VkDescriptorSetLayoutBinding[]) {
          {
             .binding = 0,
@@ -328,7 +329,21 @@ static VkResult CreatePipeline() {
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = NULL
          },
-      }
+         {
+            .binding = 3,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorCount = 1024,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL
+         },
+         {
+            .binding = 4,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .descriptorCount = 2,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL
+         },
+}
    }, NULL, &setLayout);
    if (res != VK_SUCCESS) {
       return -1;
@@ -380,9 +395,13 @@ static VkResult CreateDescriptorSet(VkBuffer buffer) {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
       .flags = 0,
       .maxSets = 1,
-      .poolSizeCount = 1,
+      .poolSizeCount = 3,
       .pNext = NULL,
-      .pPoolSizes = (const VkDescriptorPoolSize[]) {{.descriptorCount = 3, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}}
+      .pPoolSizes = (const VkDescriptorPoolSize[]) {
+         {.descriptorCount = 3, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+         {.descriptorCount = 1024, .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE},
+         {.descriptorCount = 2, .type = VK_DESCRIPTOR_TYPE_SAMPLER},
+      }
    }, NULL, &descriptorPool);
    if (res != VK_SUCCESS)
       return -1;
@@ -500,6 +519,209 @@ static VkResult UpdateBvhBuffer(VkBuffer buffer) {
    }, 0, NULL);
 }
 
+
+
+VkResult CreateSamplers() {
+   VkSampler samplers[2];
+   VkResult res;
+   res = vkCreateSampler(device, &(VkSamplerCreateInfo) {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .magFilter = VK_FILTER_NEAREST,
+      .minFilter = VK_FILTER_NEAREST,
+      .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+      .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+      .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+      .anisotropyEnable = false,
+      .maxAnisotropy = 16,
+      .compareEnable = false,
+      .flags = 0,
+      .pNext = NULL
+   }, NULL, &samplers[0]);
+   if (res != VK_SUCCESS)
+      return -1;
+
+   res = vkCreateSampler(device, &(VkSamplerCreateInfo) {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .magFilter = VK_FILTER_LINEAR,
+      .minFilter = VK_FILTER_LINEAR,
+      .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+      .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+      .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+      .anisotropyEnable = false,
+      .maxAnisotropy = 16,
+      .compareEnable = false,
+      .flags = 0,
+      .pNext = NULL
+   }, NULL, &samplers[1]);
+   if (res != VK_SUCCESS)
+      return -1;
+
+   vkUpdateDescriptorSets(device, 1, &(const VkWriteDescriptorSet) {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptorSet,
+      .dstBinding = 4,
+      .dstArrayElement = 0,
+      .pNext = NULL,
+      .descriptorCount = 2,
+      .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+      .pBufferInfo = NULL,
+      .pImageInfo = (VkDescriptorImageInfo[]) {
+         {
+            .sampler = samplers[0],
+            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .imageView = VK_NULL_HANDLE,
+         },
+         {
+            .sampler = samplers[1],
+            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .imageView = VK_NULL_HANDLE,
+         }
+      },
+      .pTexelBufferView = NULL,
+   }, 0, NULL);
+
+   return res;
+}
+
+int AddTexture(SDL_Surface *surface) {
+   VkExtent3D extent;
+   extent.width = surface->w;
+   extent.height = surface->h;
+   extent.depth = 1;
+
+   VkImage image;
+   CreateImage(VK_FORMAT_R8G8B8A8_UNORM, extent, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, &image);
+   VkMemoryRequirements reqs;
+   vkGetImageMemoryRequirements(device, image, &reqs);
+   VkDeviceMemory memory;
+   ImageAllocate(image, reqs, find_memory_type(&reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), &memory);
+
+   VkImageView view;
+   CreateImageView(image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, &view);
+   vkUpdateDescriptorSets(device, 1, &(const VkWriteDescriptorSet) {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptorSet,
+      .dstBinding = 3,
+      .dstArrayElement = lastTextureIndex,
+      .pNext = NULL,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+      .pBufferInfo = NULL,
+      .pImageInfo = (VkDescriptorImageInfo[]) {
+         {
+            .sampler = VK_NULL_HANDLE,
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .imageView = view
+         }
+      },
+      .pTexelBufferView = NULL,
+   }, 0, NULL);
+   lastTextureIndex++;
+
+   const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surface->format);
+   int pixelSize = details->bytes_per_pixel;
+
+   VkBuffer buffer;
+   void *texturedata;
+   CreateBuffer(surface->pitch * surface->h * pixelSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &buffer, &texturedata, false);
+   memcpy(texturedata, surface->pixels, surface->pitch * surface->h * pixelSize);
+   // TODO: Deallocate buffer
+
+   VkResult res;
+   VkCommandBuffer cmdBuffer;
+   res = vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo) {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .pNext = NULL,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandPool = cmdPool,
+      .commandBufferCount = 1,
+   }, &cmdBuffer);
+   if (res != VK_SUCCESS)
+      return -1;
+
+   vkBeginCommandBuffer(cmdBuffer, &(VkCommandBufferBeginInfo) {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .pNext = NULL,
+      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+      .pInheritanceInfo = NULL,
+   });
+
+   vkCmdPipelineBarrier(
+      cmdBuffer,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      0,
+      0,
+      NULL,
+      0,
+      NULL,
+      1,
+      &(const VkImageMemoryBarrier) {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .pNext = NULL,
+         .image = image,
+         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+         .srcAccessMask = VK_ACCESS_NONE,
+         .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+         .subresourceRange = (VkImageSubresourceRange) {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+            .levelCount = 1,
+         }
+      }
+   );
+
+   vkCmdCopyBufferToImage(cmdBuffer, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1, &(VkBufferImageCopy) {
+      .bufferImageHeight = surface->h,
+      .bufferRowLength = surface->pitch/pixelSize, // TODO: should never round
+      .bufferOffset = 0,
+      .imageExtent = extent,
+      .imageOffset = 0,
+      .imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .imageSubresource.mipLevel = 0,
+      .imageSubresource.baseArrayLayer = 0,
+      .imageSubresource.layerCount = 1,
+   });
+
+   vkCmdPipelineBarrier(
+      cmdBuffer,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+      0,
+      0,
+      NULL,
+      0,
+      NULL,
+      1,
+      &(const VkImageMemoryBarrier) {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .pNext = NULL,
+         .image = image,
+         .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+         .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+         .dstAccessMask = VK_ACCESS_NONE,
+         .subresourceRange = (VkImageSubresourceRange) {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+            .levelCount = 1,
+         }
+      }
+   );
+
+   vkEndCommandBuffer(cmdBuffer);
+   SubmitCommandBuffer(cmdBuffer);
+
+   return lastTextureIndex - 1;
+}
+
 VkResult UploadMaterials(struct Material *materials, int materialCount) {
    VkResult res;
    VkBuffer buffer;
@@ -516,10 +738,10 @@ VkResult UploadMaterials(struct Material *materials, int materialCount) {
       gpuMaterials[i].enableTexture = materials[i].enableTexture;
       gpuMaterials[i].ior = materials[i].ior;
       gpuMaterials[i].metallic = materials[i].metallic;
-      gpuMaterials[i].normalMap = -1;
+      gpuMaterials[i].normalMap = materials[i].normalMap != NULL ? AddTexture(materials[i].normalMap) : -1;
       gpuMaterials[i].roughness = materials[i].roughness;
       gpuMaterials[i].roughnessMap = -1;
-      gpuMaterials[i].texture = -1;
+      gpuMaterials[i].texture = materials[i].texture != NULL ? AddTexture(materials[i].texture) : -1;
       gpuMaterials[i].transmissive = materials[i].transmissive;
    }
 
@@ -551,6 +773,7 @@ int CreateVk(int width, int height) {
    CreateBuffer(width * height * sizeof(struct Vec3), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &buffer, (void**)&frameBuffer, false);
    CreatePipeline();
    CreateDescriptorSet(buffer);
+   CreateSamplers();
    return 0;
 }
 
@@ -561,6 +784,5 @@ int RunVk(int width, int height, struct Vec3 cameraPos, struct Mat3 rotMat, uint
    SubmitCommandBuffer(commandBuffer);
    return 0;
 }
-
 
 #endif //RAYMEOWER_VK_H

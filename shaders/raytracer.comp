@@ -1,6 +1,7 @@
 #version 460
 
 #extension GL_EXT_scalar_block_layout: enable
+#extension GL_EXT_nonuniform_qualifier: enable
 
 #define PI 3.14159265
 
@@ -66,6 +67,10 @@ layout(scalar, set=0, binding=1) buffer Bvh {
 layout(scalar, set=0, binding=2) buffer M {
     Material material[];
 } material;
+
+layout(set=0, binding=3) uniform texture2D textures[1024];
+
+layout(set=0, binding=4) uniform sampler samplers[2];
 
 HitPoint TriangleIntersection(Ray ray, Triangle triangle) {
     HitPoint hit;
@@ -321,11 +326,40 @@ float FresnelDielectric(float cosTheta, float ior) {
     return ((rParl * rParl) + (rPerp * rPerp)) / 2;
 }
 
+mat3 TbnUv(vec3 n, Triangle t) {
+    vec3 edge1 = t.vertices[1] - t.vertices[0];
+    vec3 edge2 = t.vertices[2] - t.vertices[0];
+    vec2 deltaUv1 = t.uv[1] - t.uv[0];
+    vec2 deltaUv2 = t.uv[2] - t.uv[0];
+
+
+    float f = 1.0f / (deltaUv1.x * deltaUv2.y - deltaUv2.x * deltaUv1.y);
+
+    vec3 tangent;
+    vec3 bitangent;
+
+    tangent.x = f * (deltaUv2.y * edge1.x - deltaUv1.y * edge2.x);
+    tangent.y = f * (deltaUv2.y * edge1.y - deltaUv1.y * edge2.y);
+    tangent.z = f * (deltaUv2.y * edge1.z - deltaUv1.y * edge2.z);
+
+    bitangent.x = f * (-deltaUv2.x * edge1.x + deltaUv1.x * edge2.x);
+    bitangent.y = f * (-deltaUv2.x * edge1.y + deltaUv1.x * edge2.y);
+    bitangent.z = f * (-deltaUv2.x * edge1.z + deltaUv1.x * edge2.z);
+
+    mat3 TBN;
+
+    TBN[0] = normalize(tangent);
+    TBN[1] = normalize(bitangent);
+    TBN[2] = n;
+
+    return TBN;
+}
+
 vec3 Shade(Ray r, int depth) {
     Sun sun;
     sun.color = vec3(1.0, 1.0, 1.0);
     sun.dir = normalize(vec3(-0.5, -1.0, 0.4));
-    sun.intensity = 1;
+    sun.intensity = 5;
     sun.angle = 0.275;
 
     vec3 skyColor = vec3(0.5, 0.5, 0.8);
@@ -342,6 +376,31 @@ vec3 Shade(Ray r, int depth) {
             hit.normal = -InterpolateAttribute(hit, t.normals);
             float roughness = material.material[t.materialIndex].roughness;
             vec3 hitColor = material.material[t.materialIndex].color;
+
+            // Apply diffuse texture
+            if (material.material[t.materialIndex].texture != -1) {
+                mat3 uvs;
+                uvs[0] = vec3(t.uv[0], 0);
+                uvs[1] = vec3(t.uv[1], 0);
+                uvs[2] = vec3(t.uv[2], 0);
+                vec2 uv = InterpolateAttribute(hit, uvs).xy;
+                uv.y = -uv.y;
+                hitColor = texture(sampler2D(textures[nonuniformEXT(material.material[t.materialIndex].texture)], samplers[0]), uv).xyz;
+            }
+            // Apply normal texture
+            if (material.material[t.materialIndex].normalMap != -1) {
+                mat3 uvs;
+                uvs[0] = vec3(t.uv[0], 0);
+                uvs[1] = vec3(t.uv[1], 0);
+                uvs[2] = vec3(t.uv[2], 0);
+                vec2 uv = InterpolateAttribute(hit, uvs).xy;
+                uv.y = -uv.y;
+                vec3 hitNormal = texture(sampler2D(textures[nonuniformEXT(material.material[t.materialIndex].normalMap)], samplers[0]), uv).xyz;
+                hitNormal = hitNormal * (255.0/127.0) - vec3(128.0/127.0);
+                hitNormal.x = -hitNormal.x;
+                mat3 normalTbn = TbnUv(hit.normal, t);
+                hit.normal = normalTbn * hitNormal;
+            }
 
             // Apply Reflections
             vec3 incidentVector = r.direction;
@@ -385,7 +444,7 @@ vec3 Shade(Ray r, int depth) {
                 if (!shadowHit.hit || tShadowId == triangleId) {
                     float d = dot(sun.dir, hit.normal) * sun.intensity;
                     if (d < 0)
-                    d = 0;
+                        d = 0;
                     color += sun.color * d * materialColor;
                 }
 
