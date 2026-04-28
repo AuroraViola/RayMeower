@@ -48,6 +48,6 @@
     - Sky color
     - Sun
   - Rendering settings
-    - Samples and ~~depth~~
+    - ~~Samples and depth~~
     - Final render
   - Render thread

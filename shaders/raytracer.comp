@@ -396,7 +396,7 @@ vec3 Shade(Ray r, int depth) {
                 uvs[2] = vec3(t.uv[2], 0);
                 vec2 uv = InterpolateAttribute(hit, uvs).xy;
                 uv.y = -uv.y;
-                vec3 hitNormal = texture(sampler2D(textures[nonuniformEXT(material.material[t.materialIndex].normalMap)], samplers[0]), uv).xyz;
+                vec3 hitNormal = texture(sampler2D(textures[nonuniformEXT(material.material[t.materialIndex].normalMap)], samplers[1]), uv).xyz;
                 hitNormal = hitNormal * (255.0/127.0) - vec3(128.0/127.0);
                 hitNormal.x = -hitNormal.x;
                 mat3 normalTbn = TbnUv(hit.normal, t);

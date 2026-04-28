@@ -428,14 +428,26 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_FRect fr = {0, 0, width, height};
     SDL_Rect r = {0, 0, width, height};
 
-    RunVk(s.width, s.height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000), depth);
+    for (int i = 0; i < s.samples; i++) {
+        RunVk(width, height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000), depth);
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (i == 0) {
+                    tempFrameBuffer[x][y] = frameBuffer[x + y * width];
+                }
+                else {
+                    tempFrameBuffer[x][y] = Vec3Add(tempFrameBuffer[x][y], frameBuffer[x + y * width]);
+                }
+            }
+        }
+    }
     uint32_t *pixels;
     int pitch;
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);
     SDL_LockMutex(mutex);
     for (int x = 0; x < width; x++) {
         for (int y = 0; y < height; y++) {
-            ((uint32_t*)((void*)pixels + y * pitch))[x] = PackColor(frameBuffer[x + y * s.width]);
+            ((uint32_t*)((void*)pixels + y * pitch))[x] = PackColor(Vec3DivScalar(tempFrameBuffer[x][y], s.samples));
         }
     }
     SDL_UnlockMutex(mutex);
