@@ -64,6 +64,7 @@ struct PointLight {
     vec3 pos;
     vec3 color;
     float intensity;
+    float radius;
 };
 
 layout(scalar, set=0, binding=5) buffer PointLights {
@@ -253,6 +254,15 @@ vec2 UniformRandomCirclePoint(float radius, vec2 u) {
     float alpha = u.x * 2 * PI;
     radius = sqrt(u.y) * radius;
     return vec2(radius * sin(alpha), radius * cos(alpha));
+}
+
+vec3 UniformRandomSpherePoint(float radius, vec2 u) {
+    float sinx = sin(u.x * 2 * PI);
+    float siny = sin(u.y * 2 * PI);
+    float cosx = cos(u.x * 2 * PI);
+    float cosy = cos(u.y * 2 * PI);
+
+    return radius * vec3(sinx * cosy, sinx * siny, cosx);
 }
 
 vec3 cosWeightedRandomHemisphereDirection(vec3 n) {
@@ -470,13 +480,14 @@ vec3 Shade(Ray r, int depth) {
 
                 // Apply lights shadows and contributions
                 for (int i = 0; i < lights.count; i++) {
+                    vec3 pos = lights.lights[i].pos + UniformRandomSpherePoint(lights.lights[i].radius, vec2(rand(), rand()));
                     vec3 tempColor = hitColor;
-                    vec3 incidentVector = hit.point - lights.lights[i].pos;
+                    vec3 incidentVector = hit.point - pos;
                     float distance = length(incidentVector);
                     incidentVector /= distance;
 
                     Ray shadowRay;
-                    shadowRay.origin = lights.lights[i].pos;
+                    shadowRay.origin = pos;
                     shadowRay.direction = incidentVector;
                     Triangle tLightShadow;
                     int tLightShadowId;

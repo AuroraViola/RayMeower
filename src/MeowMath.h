@@ -91,6 +91,7 @@ struct PointLight {
     struct Vec3 pos;
     struct Vec3 color;
     float intensity;
+    float radius;
 };
 
 struct PointLights {

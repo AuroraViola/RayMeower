@@ -240,7 +240,7 @@ void NkMenuDraw(struct Settings *settings, struct Scene *scene) {
     nk_end(ctx);
 
     /* Point lights */
-    if (nk_begin(ctx, "Point lights", nk_rect(16, 397, 250, 275),
+    if (nk_begin(ctx, "Point lights", nk_rect(16, 397, 250, 280),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {
@@ -283,6 +283,7 @@ void NkMenuDraw(struct Settings *settings, struct Scene *scene) {
             scene->lightsGpu->lights[settings->selectedPointLight].color.z = lightColor.b;
             nk_layout_row_dynamic(ctx, 25, 1);
             nk_property_float(ctx, "Intensity", 0, &scene->lightsGpu->lights[settings->selectedPointLight].intensity, INFINITY, 0.01f,0.05f);
+            nk_property_float(ctx, "Radius", 0, &scene->lightsGpu->lights[settings->selectedPointLight].radius, INFINITY, 0.01f,0.05f);
             nk_property_float(ctx, "X:", -INFINITY, &scene->lightsGpu->lights[settings->selectedPointLight].pos.x, INFINITY, 0.01f,0.05f);
             nk_property_float(ctx, "Y:", -INFINITY, &scene->lightsGpu->lights[settings->selectedPointLight].pos.y, INFINITY, 0.01f,0.05f);
             nk_property_float(ctx, "Z:", -INFINITY, &scene->lightsGpu->lights[settings->selectedPointLight].pos.z, INFINITY, 0.01f,0.05f);

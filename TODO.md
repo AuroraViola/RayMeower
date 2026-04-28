@@ -5,7 +5,8 @@
   - ~~Normal map~~
   - ~~Roughness map~~
   - Metal map
-- Point light soft shadow
+  - Transmissive map
+- ~~Point light soft shadow~~
 - ~~Sun soft shadow~~
 - ~~Smooth shading~~
 - Tent filtering
@@ -25,7 +26,7 @@
   - ~~temporal accumulation~~
   - motion vectors
 - Depth of field
-- GPU Rendering
+- ~~GPU Rendering~~
   - ~~Triangle intersection~~
   - ~~Sun~~
     - ~~Shadows~~
