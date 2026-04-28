@@ -36,6 +36,7 @@ struct PushConstants {
    int depth;
    struct Sun sun;
    struct Vec3 skyColor;
+   float cumFact;
 };
 
 static void InitVk() {
@@ -462,7 +463,7 @@ static VkResult AllocateCommandBuffer(VkCommandBuffer *cmdBuffer, int width, int
    vkCmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
    vkCmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-   struct PushConstants pc = {width, height, cameraPos, rotMat, time, settings->depth, scene->sun, settings->skyColor};
+   struct PushConstants pc = {width, height, cameraPos, rotMat, time, settings->depth, scene->sun, settings->skyColor, settings->cumFact};
    vkCmdPushConstants(*cmdBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
    vkCmdDispatch(*cmdBuffer, width/8, height/8, 1);

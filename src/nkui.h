@@ -69,21 +69,17 @@ struct Settings {
     int height;
     int width;
 
-    int renderSamples;
-    int renderDepth;
-    int renderHeight;
-    int renderWidth;
-
     float sunElevation;
     float sunRotation;
-
-    bool renderMode;
 
     union {
         struct Vec3 skyColor;
         struct nk_colorf skyColorNk;
     };
     int selectedMaterial;
+
+    float cumFact;
+    int cumSamples;
 };
 
 char *materialNames = NULL;
@@ -130,31 +126,20 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
     nk_input_end(ctx);
 
     /* Rendering settings */
-    if (nk_begin(ctx, "Renderer", nk_rect(16, 16, 250, 380),
+    if (nk_begin(ctx, "Renderer", nk_rect(16, 16, 250, 165),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
         {
         nk_layout_row_dynamic(ctx, 25, 1);
-
-        nk_label(ctx, "Viewport", NK_TEXT_CENTERED);
         nk_property_int(ctx, "Resolution X:", 32, &settings->width, 1920, 1, 1);
         nk_property_int(ctx, "Resolution Y:", 32, &settings->height, 1080, 1, 1);
         nk_property_int(ctx, "Samples:", 1, &settings->samples, 64, 1, 0.2);
         nk_property_int(ctx, "Depth:", 1, &settings->depth, 8, 1, 0.2);
-
-        nk_label(ctx, "Final render", NK_TEXT_CENTERED);
-        if (nk_button_label(ctx, "Render Image")) {
-            settings->renderMode = true;
-        }
-        nk_property_int(ctx, "Resolution X: ", 64, &settings->renderWidth, 3840, 1, 1);
-        nk_property_int(ctx, "Resolution Y: ",  64, &settings->renderHeight, 2160, 1, 1);
-        nk_property_int(ctx, "Samples: ", 1, &settings->renderSamples, 1024, 1, 1);
-        nk_property_int(ctx, "Depth: ", 1, &settings->renderDepth, 64, 1, 1);
     }
     nk_end(ctx);
 
     /* Scene settings */
-    if (nk_begin(ctx, "Scene", nk_rect(282, 16, 250, 250),
+    if (nk_begin(ctx, "Scene", nk_rect(16, 189, 250, 225),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {
@@ -195,7 +180,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
     nk_end(ctx);
 
     /* Materials */
-    if (nk_begin(ctx, "Materials", nk_rect(548, 16, 250, 370),
+    if (nk_begin(ctx, "Materials", nk_rect(276, 16, 250, 370),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {

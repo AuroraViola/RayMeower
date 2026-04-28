@@ -21,7 +21,7 @@
 - Reducing noise effects
   - Blue noise
   - filter
-  - temporal accumulation
+  - ~~temporal accumulation~~
   - motion vectors
 - Depth of field
 - GPU Rendering

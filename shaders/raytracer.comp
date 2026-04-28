@@ -218,6 +218,7 @@ layout(push_constant, scalar) uniform Pc{
     int depth;
     Sun sun;
     vec3 skyColor;
+    float cumFact;
 } pc;
 
 mat3 Tbn(vec3 n) {
@@ -510,8 +511,5 @@ void main() {
 
     vec3 color = Shade(r, pc.depth);
 
-    float exposure = 1.5;
-    color = 1 - exp(-color * exposure);
-
-    o.a[pos.x + pos.y * pc.width] = color;
+    o.a[pos.x + pos.y * pc.width] = mix(o.a[pos.x + pos.y * pc.width], color, pc.cumFact);
 }

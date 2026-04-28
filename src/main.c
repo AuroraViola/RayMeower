@@ -75,17 +75,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     inputStates.menu = false;
     s.samples = 1;
     s.depth = 6;
-    s.renderSamples = 512;
-    s.renderDepth = 16;
     s.skyColor = Vec3(0.5, 0.5, 0.8);
     s.width = 1024;
     s.height = 768;
-    s.renderWidth = 1440;
-    s.renderHeight = 1080;
-    s.renderMode = false;
     s.selectedMaterial = 0;
     s.sunElevation = 30;
     s.sunRotation = 40;
+    s.cumSamples = 1;
 
     mutex = SDL_CreateMutex();
 
@@ -406,48 +402,52 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     last_time = t;
     float speed = 6.0f;
 
+    s.cumFact = 1.0/s.cumSamples;
     if (!inputStates.menu) {
+        static float prevMouseHorizontal = 0.0f;
+        static float prevMouseVertical = 0.0f;
         struct Vec3 posDelta = {0};
         posDelta.x = inputStates.right * speed * dt;
         posDelta.y = inputStates.up * speed * dt;
         posDelta.z = inputStates.forward * speed * dt;
         struct Mat3 rot = RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0);
+        if (prevMouseHorizontal != inputStates.mouseHorizontal || prevMouseVertical != inputStates.mouseVertical || posDelta.x != 0 || posDelta.y != 0 || posDelta.z != 0) {
+            prevMouseVertical = inputStates.mouseVertical;
+            prevMouseHorizontal = inputStates.mouseHorizontal;
+            s.cumFact = 1;
+            s.cumSamples = 1;
+        }
         posDelta = Mat3Vec3Mul(rot, posDelta);
         cameraPos = Vec3Add(cameraPos, posDelta);
     }
+    else {
+        s.cumFact = 1;
+        s.cumSamples = 1;
+    }
+    s.cumSamples++;
 
 
     int height = s.height;
     int width = s.width;
     int depth = s.depth;
-    if (s.renderMode) {
-        height = s.renderHeight;
-        width = s.renderWidth;
-        depth = s.renderDepth;
-    }
     SDL_FRect fr = {0, 0, width, height};
     SDL_Rect r = {0, 0, width, height};
 
-    for (int i = 0; i < s.samples; i++) {
-        RunVk(width, height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000), &scene, &s);
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                if (i == 0) {
-                    tempFrameBuffer[x][y] = frameBuffer[x + y * width];
-                }
-                else {
-                    tempFrameBuffer[x][y] = Vec3Add(tempFrameBuffer[x][y], frameBuffer[x + y * width]);
-                }
-            }
-        }
-    }
+    RunVk(width, height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000), &scene, &s);
     uint32_t *pixels;
     int pitch;
     SDL_LockTexture(renderTexture, &r, (void**)&pixels, &pitch);
     SDL_LockMutex(mutex);
     for (int x = 0; x < width; x++) {
         for (int y = 0; y < height; y++) {
-            ((uint32_t*)((void*)pixels + y * pitch))[x] = PackColor(Vec3DivScalar(tempFrameBuffer[x][y], s.samples));
+            // TODO: make this a compute shader
+            struct Vec3 color = frameBuffer[x+y*width];
+            float exposure = 1.5;
+            color.x = 1 - exp(-color.x * exposure);
+            color.y = 1 - exp(-color.y * exposure);
+            color.z = 1 - exp(-color.z * exposure);
+
+            ((uint32_t*)((void*)pixels + y * pitch))[x] = PackColor(color);
         }
     }
     SDL_UnlockMutex(mutex);
@@ -471,16 +471,12 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 static int SDLCALL RenderThread(void *ptr) {
     while (true) {
         SDL_LockMutex(mutex);
-        bool renderMode = s.renderMode;
+        bool renderMode = false;
         currentRender = !currentRender;
         int currentTexture = currentRender;
         struct Mat3 rot = RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0);
         int height = s.height;
         int width = s.width;
-        if (renderMode) {
-            height = s.renderHeight;
-            width = s.renderWidth;
-        }
         uint32_t *pixels;
         int pitch;
 
@@ -496,12 +492,7 @@ static int SDLCALL RenderThread(void *ptr) {
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 struct Vec3 color = {0};
-                if (renderMode) {
-                    color = renderPixel(width, height, x, y, cameraPosBuf, rot, s.renderSamples, s.renderDepth);
-                }
-                else {
-                    color = renderPixel(width, height, x, y, cameraPosBuf, rot, s.samples, s.depth);
-                }
+                color = renderPixel(width, height, x, y, cameraPosBuf, rot, s.samples, s.depth);
 
                 float exposure = 1.5;
                 color.x = 1 - exp(-color.x * exposure);
@@ -532,7 +523,6 @@ static int SDLCALL RenderThread(void *ptr) {
                 fprintf(f,"%d %d %d ", (color >> 24) & 0xff, (color >> 16) & 0xff, (color >> 8) & 0xff);
             }
             fclose(f);
-            s.renderMode = false;
         }
     }
 }
