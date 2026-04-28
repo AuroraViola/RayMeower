@@ -91,6 +91,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     UpdateBvhBuffer(linearBVH.buffer);
     UploadMaterials(scene.mesh.material, scene.mesh.materialCount);
     scene.mesh.materialGpu = gpuMaterials;
+    UploadPointLights(scene.lights, scene.lightsCount);
 
     return SDL_APP_CONTINUE;
 }

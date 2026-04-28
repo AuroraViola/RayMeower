@@ -21,6 +21,7 @@ static VkDescriptorSet descriptorSet;
 static VkPipelineLayout pipelineLayout;
 static struct Vec3 *frameBuffer;
 static struct MaterialGpu *gpuMaterials;
+static struct PointLights *gpuPointLights;
 static int lastTextureIndex = 0;
 
 static uint32_t shaderCode[] = {
@@ -311,7 +312,7 @@ static VkResult CreatePipeline() {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
       .flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT,
       .pNext = NULL,
-      .bindingCount = 5,
+      .bindingCount = 6,
       .pBindings = (VkDescriptorSetLayoutBinding[]) {
          {
             .binding = 0,
@@ -345,6 +346,13 @@ static VkResult CreatePipeline() {
             .binding = 4,
             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
             .descriptorCount = 2,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL
+         },
+         {
+            .binding = 5,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = NULL
          },
@@ -403,7 +411,7 @@ static VkResult CreateDescriptorSet(VkBuffer buffer) {
       .poolSizeCount = 3,
       .pNext = NULL,
       .pPoolSizes = (const VkDescriptorPoolSize[]) {
-         {.descriptorCount = 3, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+         {.descriptorCount = 4, .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
          {.descriptorCount = 1024, .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE},
          {.descriptorCount = 2, .type = VK_DESCRIPTOR_TYPE_SAMPLER},
       }
@@ -523,8 +531,6 @@ static VkResult UpdateBvhBuffer(VkBuffer buffer) {
       .pTexelBufferView = NULL,
    }, 0, NULL);
 }
-
-
 
 VkResult CreateSamplers() {
    VkSampler samplers[2];
@@ -759,6 +765,37 @@ VkResult UploadMaterials(struct Material *materials, int materialCount) {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
       .dstSet = descriptorSet,
       .dstBinding = 2,
+      .dstArrayElement = 0,
+      .pNext = NULL,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pBufferInfo = &(VkDescriptorBufferInfo) {
+         .buffer = buffer,
+         .offset = 0,
+         .range = VK_WHOLE_SIZE,
+      },
+      .pImageInfo = NULL,
+      .pTexelBufferView = NULL,
+   }, 0, NULL);
+   return res;
+}
+
+VkResult UploadPointLights(struct PointLight *pointLights, int lightCount) {
+   VkResult res;
+   VkBuffer buffer;
+   res = CreateBuffer(sizeof(int) + sizeof(struct PointLight) * 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &buffer, (void**)&gpuPointLights ,true);
+   if (res != VK_SUCCESS)
+      return -1;
+
+   gpuPointLights->count = lightCount;
+   for (int i = 0; i < lightCount; i++) {
+      gpuPointLights->lights[i] = pointLights[i];
+   }
+
+   vkUpdateDescriptorSets(device, 1, &(const VkWriteDescriptorSet) {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptorSet,
+      .dstBinding = 5,
       .dstArrayElement = 0,
       .pNext = NULL,
       .descriptorCount = 1,

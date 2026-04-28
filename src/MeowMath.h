@@ -93,6 +93,10 @@ struct PointLight {
     float intensity;
 };
 
+struct PointLights {
+    int count;
+    struct PointLight lights[];
+};
 
 struct HitPoint {
     bool hit;

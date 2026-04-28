@@ -29,7 +29,7 @@
   - ~~Sun~~
     - ~~Shadows~~
     - ~~Contributions~~
-  - Point lights
+  - ~~Point lights~~
   - ~~Global illumination~~
   - ~~Anti aliasing~~
   - ~~Materials~~
@@ -50,4 +50,4 @@
   - Rendering settings
     - ~~Samples and depth~~
     - Final render
-  - Render thread
+  - ~~Render thread~~

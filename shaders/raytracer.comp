@@ -60,6 +60,17 @@ layout(scalar) struct Material {
     int enableNormalMap;
 };
 
+struct PointLight {
+    vec3 pos;
+    vec3 color;
+    float intensity;
+};
+
+layout(scalar, set=0, binding=5) buffer PointLights {
+    int count;
+    PointLight lights[];
+} lights;
+
 layout(scalar, set=0, binding=1) buffer Bvh {
     BvhNode node[];
 } bvh;
@@ -415,6 +426,8 @@ vec3 Shade(Ray r, int depth) {
             float randTrans = rand();
 
             float fresnel = mix(material.material[t.materialIndex].metallic, 1, FresnelDielectric(cosTheta, material.material[t.materialIndex].ior));
+
+            // Metallic
             if (fresnel > rand()) {
                 mat3 tbn = Tbn(cosTheta < 0 ? -hit.normal : hit.normal);
                 vec3 tbnIncident = incidentVector * tbn;
@@ -431,11 +444,12 @@ vec3 Shade(Ray r, int depth) {
                 r = reflectionRay;
                 materialColor *= mix(vec3(1), hitColor, material.material[t.materialIndex].metallic);
             }
+            // Diffuse
             else if (randTrans > material.material[t.materialIndex].transmissive) {
                 color += materialColor * material.material[t.materialIndex].emissionColor * material.material[t.materialIndex].emissionIntensity;
                 materialColor *= hitColor;
 
-                // Apply sun shadows
+                // Apply sun shadows and contributions
                 Ray shadowRay;
                 shadowRay.direction = -pc.sun.dir;
                 vec2 u = vec2(rand(), rand());
@@ -452,6 +466,29 @@ vec3 Shade(Ray r, int depth) {
                     if (d < 0)
                         d = 0;
                     color += pc.sun.color * d * materialColor;
+                }
+
+                // Apply lights shadows and contributions
+                for (int i = 0; i < lights.count; i++) {
+                    vec3 tempColor = hitColor;
+                    vec3 incidentVector = hit.point - lights.lights[i].pos;
+                    float distance = length(incidentVector);
+                    incidentVector /= distance;
+
+                    Ray shadowRay;
+                    shadowRay.origin = lights.lights[i].pos;
+                    shadowRay.direction = incidentVector;
+                    Triangle tLightShadow;
+                    int tLightShadowId;
+                    shadowHit = BVHHit(shadowRay, tLightShadow, tLightShadowId);
+                    if (shadowHit.hit && tLightShadowId != triangleId) {
+                        continue;
+                    }
+
+                    float d = dot(incidentVector, hit.normal) / (distance * distance) * lights.lights[i].intensity;
+                    if (d < 0)
+                        d = 0;
+                    color += lights.lights[i].color * d * materialColor;
                 }
 
                 // Diffuse global illumination
