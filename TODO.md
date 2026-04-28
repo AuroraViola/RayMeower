@@ -44,9 +44,9 @@
     - ~~Emission color~~
     - ~~Roughness, metallic, transmissive and ior~~
     - ~~Texture enabler~~
-  - Scene settings
-    - Sky color
-    - Sun
+  - ~~Scene settings~~
+    - ~~Sky color~~
+    - ~~Sun~~
   - Rendering settings
     - ~~Samples and depth~~
     - Final render

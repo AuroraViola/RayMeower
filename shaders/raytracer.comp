@@ -216,6 +216,8 @@ layout(push_constant, scalar) uniform Pc{
     mat3 rotmat;
     uint time;
     int depth;
+    Sun sun;
+    vec3 skyColor;
 } pc;
 
 mat3 Tbn(vec3 n) {
@@ -357,14 +359,6 @@ mat3 TbnUv(vec3 n, Triangle t) {
 }
 
 vec3 Shade(Ray r, int depth) {
-    Sun sun;
-    sun.color = vec3(1.0, 1.0, 1.0);
-    sun.dir = normalize(vec3(-0.5, -1.0, 0.4));
-    sun.intensity = 5;
-    sun.angle = 0.275;
-
-    vec3 skyColor = vec3(0.5, 0.5, 0.8);
-
     vec3 color = vec3(0.0);
     vec3 materialColor = vec3(1.0);
 
@@ -442,9 +436,9 @@ vec3 Shade(Ray r, int depth) {
 
                 // Apply sun shadows
                 Ray shadowRay;
-                shadowRay.direction = -sun.dir;
+                shadowRay.direction = -pc.sun.dir;
                 vec2 u = vec2(rand(), rand());
-                vec2 randomPoint = UniformRandomCirclePoint(tan(sun.angle/180*PI), u);
+                vec2 randomPoint = UniformRandomCirclePoint(tan(pc.sun.angle/180*PI), u);
                 mat3 tbn = Tbn(shadowRay.direction);
                 shadowRay.direction = tbn * normalize(vec3(randomPoint.x, randomPoint.y, 1));
                 shadowRay.origin = hit.point + (shadowRay.direction * 0.001);
@@ -453,10 +447,10 @@ vec3 Shade(Ray r, int depth) {
                 int tShadowId;
                 shadowHit = BVHHit(shadowRay, tShadow, tShadowId);
                 if (!shadowHit.hit || tShadowId == triangleId) {
-                    float d = dot(sun.dir, hit.normal) * sun.intensity;
+                    float d = dot(pc.sun.dir, hit.normal) * pc.sun.intensity;
                     if (d < 0)
                         d = 0;
-                    color += sun.color * d * materialColor;
+                    color += pc.sun.color * d * materialColor;
                 }
 
                 // Diffuse global illumination
@@ -484,10 +478,10 @@ vec3 Shade(Ray r, int depth) {
             }
         }
         else {
-            if (-dot(r.direction, sun.dir) > cos(sun.angle / 180 * PI)) {
-                color += sun.color * sun.intensity * materialColor;
+            if (-dot(r.direction, pc.sun.dir) > cos(pc.sun.angle / 180 * PI)) {
+                color += pc.sun.color * pc.sun.intensity * materialColor;
             }
-            color += skyColor * materialColor;
+            color += pc.skyColor * materialColor;
             break;
         }
     }

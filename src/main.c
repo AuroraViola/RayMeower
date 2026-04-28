@@ -429,7 +429,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_Rect r = {0, 0, width, height};
 
     for (int i = 0; i < s.samples; i++) {
-        RunVk(width, height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000), depth);
+        RunVk(width, height, cameraPos, RotMat(inputStates.mouseHorizontal, inputStates.mouseVertical, 0), (uint32_t)SDL_rand(100000), &scene, &s);
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 if (i == 0) {

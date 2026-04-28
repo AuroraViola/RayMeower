@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 #include <assert.h>
 #include "MeowMath.h"
+#include "nkui.h"
 #define error(a) ({printf(a); abort();})
 
 static VkInstance instance;
@@ -33,6 +34,8 @@ struct PushConstants {
    struct Mat3 rotmat;
    uint32_t time;
    int depth;
+   struct Sun sun;
+   struct Vec3 skyColor;
 };
 
 static void InitVk() {
@@ -437,7 +440,7 @@ static VkResult CreateDescriptorSet(VkBuffer buffer) {
    return res;
 }
 
-static VkResult AllocateCommandBuffer(VkCommandBuffer *cmdBuffer, int width, int height, struct Vec3 cameraPos, struct Mat3 rotMat, uint32_t time, int depth) {
+static VkResult AllocateCommandBuffer(VkCommandBuffer *cmdBuffer, int width, int height, struct Vec3 cameraPos, struct Mat3 rotMat, uint32_t time, struct Scene *scene, struct Settings *settings) {
    VkResult res;
    res = vkAllocateCommandBuffers(device, &(VkCommandBufferAllocateInfo) {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -459,7 +462,7 @@ static VkResult AllocateCommandBuffer(VkCommandBuffer *cmdBuffer, int width, int
    vkCmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
    vkCmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-   struct PushConstants pc = {width, height, cameraPos, rotMat, time, depth};
+   struct PushConstants pc = {width, height, cameraPos, rotMat, time, settings->depth, scene->sun, settings->skyColor};
    vkCmdPushConstants(*cmdBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
    vkCmdDispatch(*cmdBuffer, width/8, height/8, 1);
@@ -783,9 +786,9 @@ int CreateVk(int width, int height) {
    return 0;
 }
 
-int RunVk(int width, int height, struct Vec3 cameraPos, struct Mat3 rotMat, uint32_t time, int depth) {
+int RunVk(int width, int height, struct Vec3 cameraPos, struct Mat3 rotMat, uint32_t time, struct Scene *scene, struct Settings *settings) {
    VkCommandBuffer commandBuffer;
-   AllocateCommandBuffer(&commandBuffer, width, height, cameraPos, rotMat, time, depth);
+   AllocateCommandBuffer(&commandBuffer, width, height, cameraPos, rotMat, time, scene, settings);
 
    SubmitCommandBuffer(commandBuffer);
    return 0;
