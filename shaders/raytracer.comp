@@ -379,7 +379,7 @@ vec3 Shade(Ray r, int depth) {
             vec3 hitColor = material.material[t.materialIndex].color;
 
             // Apply diffuse texture
-            if (material.material[t.materialIndex].texture != -1) {
+            if (material.material[t.materialIndex].texture != -1 && material.material[t.materialIndex].enableTexture == 1) {
                 mat3 uvs;
                 uvs[0] = vec3(t.uv[0], 0);
                 uvs[1] = vec3(t.uv[1], 0);
@@ -389,7 +389,7 @@ vec3 Shade(Ray r, int depth) {
                 hitColor = texture(sampler2D(textures[nonuniformEXT(material.material[t.materialIndex].texture)], samplers[0]), uv).xyz;
             }
             // Apply normal texture
-            if (material.material[t.materialIndex].normalMap != -1) {
+            if (material.material[t.materialIndex].normalMap != -1 && material.material[t.materialIndex].enableNormalMap == 1) {
                 mat3 uvs;
                 uvs[0] = vec3(t.uv[0], 0);
                 uvs[1] = vec3(t.uv[1], 0);

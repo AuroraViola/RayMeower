@@ -39,11 +39,11 @@
     - ~~Diffuse map~~
     - ~~Normal map~~
     - Roughness map
-  - Material editor
+  - ~~Material editor~~
     - ~~Material color~~
     - ~~Emission color~~
     - ~~Roughness, metallic, transmissive and ior~~
-    - Texture enabler
+    - ~~Texture enabler~~
   - Scene settings
     - Sky color
     - Sun

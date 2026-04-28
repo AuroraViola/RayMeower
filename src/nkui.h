@@ -241,9 +241,9 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
         nk_layout_row_dynamic(ctx, 25, 1);
         scene->mesh.materialGpu[settings->selectedMaterial].emissionIntensity = nk_propertyf(ctx, "Emission intensity", 0.0f, scene->mesh.materialGpu[settings->selectedMaterial].emissionIntensity, 100.0f, 0.01f,0.01f);
         scene->mesh.materialGpu[settings->selectedMaterial].transmissive = nk_propertyf(ctx, "Transmissive", 0.0f, scene->mesh.materialGpu[settings->selectedMaterial].transmissive, 1.0f, 0.01f,0.005f);
-        scene->mesh.material[settings->selectedMaterial].enableTexture = nk_check_label(ctx, "Diffuse map", scene->mesh.material[settings->selectedMaterial].enableTexture);
-        scene->mesh.material[settings->selectedMaterial].enableRoughnessMap = nk_check_label(ctx, "Roughness map", scene->mesh.material[settings->selectedMaterial].enableRoughnessMap);
-        scene->mesh.material[settings->selectedMaterial].enableNormalMap = nk_check_label(ctx, "Normal map", scene->mesh.material[settings->selectedMaterial].enableNormalMap);
+        scene->mesh.materialGpu[settings->selectedMaterial].enableTexture = nk_check_label(ctx, "Diffuse map", scene->mesh.materialGpu[settings->selectedMaterial].enableTexture);
+        scene->mesh.materialGpu[settings->selectedMaterial].enableRoughnessMap = nk_check_label(ctx, "Roughness map", scene->mesh.materialGpu[settings->selectedMaterial].enableRoughnessMap);
+        scene->mesh.materialGpu[settings->selectedMaterial].enableNormalMap = nk_check_label(ctx, "Normal map", scene->mesh.materialGpu[settings->selectedMaterial].enableNormalMap);
     }
     nk_end(ctx);
 }
