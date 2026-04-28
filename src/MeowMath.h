@@ -603,4 +603,12 @@ static inline uint32_t PackColor(struct Vec3 color) {
     return 0xff | ((uint32_t)(color.x*255)) << 24 | ((uint32_t)(color.y*255)) << 16 | ((uint32_t)(color.z*255)) << 8;
 }
 
+static inline struct Vec3 Reinhard(struct Vec3 color, float exposure) {
+    return (struct Vec3) {
+        .x = 1 - exp(-color.x * exposure),
+        .y = 1 - exp(-color.y * exposure),
+        .z = 1 - exp(-color.z * exposure)
+    };
+}
+
 #endif //RAYMEOWER_MEOWMATH_H

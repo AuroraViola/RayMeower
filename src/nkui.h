@@ -64,7 +64,6 @@
 #include "MeowMath.h"
 
 struct Settings {
-    int samples;
     int depth;
     int height;
     int width;
@@ -122,24 +121,31 @@ void NkUiInit(SDL_Window *window, SDL_Renderer *renderer, struct Scene *scene) {
     nk_input_begin(ctx);
 }
 
-void NkUiDraw(struct Settings *settings, struct Scene *scene) {
-    nk_input_end(ctx);
+void NkFpsDraw(float dt, int w, int h) {
+    if (nk_begin(ctx, "", nk_rect(w-16-90, 16, 90, 35), NK_WINDOW_NOT_INTERACTIVE | NK_WINDOW_NO_SCROLLBAR)) {
+        nk_layout_row_dynamic(ctx, 25, 1);
+        char fpsBuffer[50];
+        sprintf(fpsBuffer, "%5.2f FPS", 1.0f / dt);
+        nk_label(ctx, fpsBuffer, NK_TEXT_CENTERED);
+    }
+    nk_end(ctx);
+}
 
+void NkMenuDraw(struct Settings *settings, struct Scene *scene) {
     /* Rendering settings */
-    if (nk_begin(ctx, "Renderer", nk_rect(16, 16, 250, 165),
+    if (nk_begin(ctx, "Renderer", nk_rect(16, 16, 250, 140),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
         {
         nk_layout_row_dynamic(ctx, 25, 1);
         nk_property_int(ctx, "Resolution X:", 32, &settings->width, 1920, 1, 1);
         nk_property_int(ctx, "Resolution Y:", 32, &settings->height, 1080, 1, 1);
-        nk_property_int(ctx, "Samples:", 1, &settings->samples, 64, 1, 0.2);
         nk_property_int(ctx, "Depth:", 1, &settings->depth, 8, 1, 0.2);
     }
     nk_end(ctx);
 
     /* Scene settings */
-    if (nk_begin(ctx, "Scene", nk_rect(16, 189, 250, 225),
+    if (nk_begin(ctx, "Scene", nk_rect(16, 164, 250, 225),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {
@@ -180,7 +186,7 @@ void NkUiDraw(struct Settings *settings, struct Scene *scene) {
     nk_end(ctx);
 
     /* Materials */
-    if (nk_begin(ctx, "Materials", nk_rect(276, 16, 250, 370),
+    if (nk_begin(ctx, "Materials", nk_rect(274, 16, 250, 373),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
     {
