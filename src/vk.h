@@ -596,7 +596,7 @@ VkResult CreateSamplers() {
    return res;
 }
 
-int AddTexture(SDL_Surface *surface) {
+int AddTexture(SDL_Surface *surface, bool sRGB) {
    VkExtent3D extent;
    extent.width = surface->w;
    extent.height = surface->h;
@@ -604,9 +604,18 @@ int AddTexture(SDL_Surface *surface) {
 
    const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surface->format);
    int pixelSize = details->bytes_per_pixel;
-   VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-   if (pixelSize == 1) {
-      format = VK_FORMAT_R8_UNORM;
+   VkFormat format;
+   if (sRGB) {
+      format = VK_FORMAT_R8G8B8A8_SRGB;
+      if (pixelSize == 1) {
+         format = VK_FORMAT_R8_SRGB;
+      }
+   }
+   else {
+      format = VK_FORMAT_R8G8B8A8_UNORM;
+      if (pixelSize == 1) {
+         format = VK_FORMAT_R8_UNORM;
+      }
    }
 
    VkImage image;
@@ -754,10 +763,10 @@ VkResult UploadMaterials(struct Material *materials, int materialCount) {
       gpuMaterials[i].enableTexture = materials[i].enableTexture;
       gpuMaterials[i].ior = materials[i].ior;
       gpuMaterials[i].metallic = materials[i].metallic;
-      gpuMaterials[i].normalMap = materials[i].normalMap != NULL ? AddTexture(materials[i].normalMap) : -1;
+      gpuMaterials[i].normalMap = materials[i].normalMap != NULL ? AddTexture(materials[i].normalMap, false) : -1;
       gpuMaterials[i].roughness = materials[i].roughness;
-      gpuMaterials[i].roughnessMap = materials[i].roughnessMap != NULL ? AddTexture(materials[i].roughnessMap) : -1;;
-      gpuMaterials[i].texture = materials[i].texture != NULL ? AddTexture(materials[i].texture) : -1;
+      gpuMaterials[i].roughnessMap = materials[i].roughnessMap != NULL ? AddTexture(materials[i].roughnessMap, false) : -1;;
+      gpuMaterials[i].texture = materials[i].texture != NULL ? AddTexture(materials[i].texture, true) : -1;
       gpuMaterials[i].transmissive = materials[i].transmissive;
    }
 
