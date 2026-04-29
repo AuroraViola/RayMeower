@@ -613,4 +613,13 @@ static inline struct Vec3 Reinhard(struct Vec3 color, float exposure) {
     };
 }
 
+
+static inline struct Vec3 GammaCorrection(struct Vec3 color) {
+    return (struct Vec3) {
+        .x = pow(color.x, 1.0 / 2.2),
+        .y = pow(color.y, 1.0 / 2.2),
+        .z = pow(color.z, 1.0 / 2.2),
+    };
+}
+
 #endif //RAYMEOWER_MEOWMATH_H

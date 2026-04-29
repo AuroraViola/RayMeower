@@ -62,7 +62,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     last_time = SDL_GetTicks();
 
 
-    scene.mesh = ImportObj("../Objs/Test.obj");
+    scene.mesh = ImportObj("../Objs/Camera.obj");
     scene.bvhRoot = BuildBVH(scene.mesh.triangles, scene.mesh.triangleCount);
 
     scene.sun = (struct Sun){.dir={0, -1, 0}, .color = {1.0, 1.0, 1.0}, .intensity = 5.0};
@@ -135,7 +135,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             FILE *f = fopen("./image.ppm", "w");
             fprintf(f, "P3\n%d %d\n%d\n", s.width, s.height, 255);
             for (int i = 0; i < s.width * s.height; i++) {
-                uint32_t color = PackColor(Reinhard(frameBuffer[i], 1.5));
+                uint32_t color = PackColor(GammaCorrection(Reinhard(frameBuffer[i], 1.0)));
                 fprintf(f,"%d %d %d ", (color >> 24) & 0xff, (color >> 16) & 0xff, (color >> 8) & 0xff);
             }
             fclose(f);
@@ -212,7 +212,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         for (int y = 0; y < s.height; y++) {
             // TODO: make this a compute shader
             struct Vec3 color = frameBuffer[x+y*s.width];
-            ((uint32_t*)((void*)pixels + y * pitch))[x] = PackColor(Reinhard(color, 1.5));
+            ((uint32_t*)((void*)pixels + y * pitch))[x] = PackColor(GammaCorrection(Reinhard(color, 1.0)));
         }
     }
     SDL_UnlockTexture(renderTexture);
